@@ -49,7 +49,7 @@ from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR
 from OPSI.Object import *
 from OPSI.System import *
-from OPSI.Types import *
+from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
 from OPSI.Util import *
 from OPSI.Util.File import IniFile
 
