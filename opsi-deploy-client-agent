@@ -120,7 +120,7 @@ class DeployThread(threading.Thread):
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
 
-			ipAddress = self._getIpAddress(hostId)
+			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
 
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
