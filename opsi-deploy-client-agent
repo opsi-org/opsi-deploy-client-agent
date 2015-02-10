@@ -37,7 +37,6 @@ __version__ = '4.0.6.1'
 
 import getopt
 import getpass
-import gettext
 import inspect
 import os
 import re
@@ -55,48 +54,34 @@ from OPSI.Util import *
 from OPSI.Util.File import IniFile
 
 
-
-
 logger = Logger()
 logLevel = LOG_WARNING
 logger.setConsoleLevel(logLevel)
 logger.setLogFormat('[%L] %M')
 logger.setConsoleColor(True)
 
-# Get locale
-try:
-	t = gettext.translation('opsi-deploy-client-agent', LOCALE_DIR)
-	_ = t.ugettext
-except Exception, e:
-	#logger.error("Locale not found: %s" % e)
-	def _(string):
-		"""Dummy method, created and called when no locale is found.
-		Uses the fallback language (called C; means english) then."""
-		return string
-
 
 def usage():
-	print _(u"\nUsage: %s [options] [host]...") % os.path.basename(sys.argv[0])
-	print _(u"Deploy opsi client agent to the specified clients.")
-	print _(u"The c$ and admin$ must be accessable on every client.")
-	print _(u"Simple File Sharing (Folder Options) should be disabled on the Windows machine.")
-	print _(u"Options:")
-	print _(u"    -h        show this help text")
-	print _(u"    -V        show version information")
-	print _(u"    -v        increase verbosity (can be used multiple times)")
-	print _(u"    -u        username for authentication (default: Administrator)")
-	print _(u"              example for a domain account: -u \"<DOMAIN>\\\\<username>\"")
-	print _(u"    -p        password for authentication")
-	print _(u"    -c        use fqdn instead of hostname for smb/cifs connection")
-	print _(u"    -x        try installation even if ping fails")
-	print _(u"    -r        reboot computer after installation")
-	print _(u"    -s        shutdown computer after installation")
-	print _(u"    -o        start opsiclientd service after installation")
-	print _(u"    -f        file containing list of clients (one hostname per line)")
-	print _(u"    -S        skip known opsi clients")
-	print _(u"    -t        number of concurrent deployment threads (default: 1)")
-	print _(u"    --server-side-mount    Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
-	print ""
+	print(u"\nUsage: %s [options] [host]..." % os.path.basename(__file__))
+	print(u"Deploy opsi client agent to the specified clients.")
+	print(u"The c$ and admin$ must be accessable on every client.")
+	print(u"Simple File Sharing (Folder Options) should be disabled on the Windows machine.")
+	print(u"Options:")
+	print(u"    -h        show this help text")
+	print(u"    -V        show version information")
+	print(u"    -v        increase verbosity (can be used multiple times)")
+	print(u"    -u        username for authentication (default: Administrator)")
+	print(u"              example for a domain account: -u \"<DOMAIN>\\\\<username>\"")
+	print(u"    -p        password for authentication")
+	print(u"    -c        use fqdn instead of hostname for smb/cifs connection")
+	print(u"    -x        try installation even if ping fails")
+	print(u"    -r        reboot computer after installation")
+	print(u"    -s        shutdown computer after installation")
+	print(u"    -o        start opsiclientd service after installation")
+	print(u"    -f        file containing list of clients (one hostname per line)")
+	print(u"    -S        skip known opsi clients")
+	print(u"    -t        number of concurrent deployment threads (default: 1)")
+	print(u"    --server-side-mount    Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
 
 
 def winexe(cmd, host, username, password):
