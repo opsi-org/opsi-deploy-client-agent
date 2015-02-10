@@ -31,7 +31,6 @@ installed via opsi.
 :license: GNU Affero General Public License version 3
 """
 
-import getopt
 import getpass
 import inspect
 import os
@@ -50,37 +49,18 @@ from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
 from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
 
+try:
+	import argparse
+except ImportError:
+	from OPSI.Util import argparse
+
 __version__ = '4.0.6.1'
 
 
 logger = Logger()
-logLevel = LOG_WARNING
-logger.setConsoleLevel(logLevel)
+logger.setConsoleLevel(LOG_WARNING)
 logger.setLogFormat('[%L] %M')
 logger.setConsoleColor(True)
-
-
-def usage():
-	print(u"\nUsage: %s [options] [host]..." % os.path.basename(__file__))
-	print(u"Deploy opsi client agent to the specified clients.")
-	print(u"The c$ and admin$ must be accessable on every client.")
-	print(u"Simple File Sharing (Folder Options) should be disabled on the Windows machine.")
-	print(u"Options:")
-	print(u"    -h        show this help text")
-	print(u"    -V        show version information")
-	print(u"    -v        increase verbosity (can be used multiple times)")
-	print(u"    -u        username for authentication (default: Administrator)")
-	print(u"              example for a domain account: -u \"<DOMAIN>\\\\<username>\"")
-	print(u"    -p        password for authentication")
-	print(u"    -c        use fqdn instead of hostname for smb/cifs connection")
-	print(u"    -x        try installation even if ping fails")
-	print(u"    -r        reboot computer after installation")
-	print(u"    -s        shutdown computer after installation")
-	print(u"    -o        start opsiclientd service after installation")
-	print(u"    -f        file containing list of clients (one hostname per line)")
-	print(u"    -S        skip known opsi clients")
-	print(u"    -t        number of concurrent deployment threads (default: 1)")
-	print(u"    --server-side-mount    Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
 
 
 def winexe(cmd, host, username, password):
@@ -593,70 +573,63 @@ class DeployThread(threading.Thread):
 
 
 def main(argv):
-	global logLevel
-	hosts = []
-	hostFile = None
-	username = u''
-	password = u''
-	shutdown = False
-	reboot = False
-	startService = False
-	useNetbios = True
-	stopOnPingFailure = True
-	skipExistingClient = False
-	maxThreads = 1
-	clientSideMount = True
+	parser = argparse.ArgumentParser(
+		description=(
+			u"Deploy opsi client agent to the specified clients.\n"
+			u"The c$ and admin$ must be accessable on every client.\n"
+			u"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
+		)
+	)
+	parser.add_argument('-V', action='version', version=__version__)
+	parser.add_argument('-v', dest="logLevel", default=LOG_WARNING, action="count",
+						help="increase verbosity (can be used multiple times)")
+	parser.add_argument('-u', dest="username", default=u"Administrator",
+						help=(
+							u'username for authentication (default: Administrator).\n'
+							u"example for a domain account: -u \"<DOMAIN>\\\\<username>\""
+							)
+						)
+	parser.add_argument('-p', dest="password", default=u"",
+						help=u"password for authentication")
+	parser.add_argument('-c', dest="useNetbios", default=True,
+						action="store_false",
+						help=u"use fqdn instead of hostname for smb/cifs connection")
+	parser.add_argument('-x', dest="stopOnPingFailure", default=True,
+						action="store_false",
+						help=u"try installation even if ping fails")
+	parser.add_argument('-r', dest="reboot", default=False, action="store_true",
+						help=u"reboot computer after installation")
+	parser.add_argument('-s', dest="shutdown", default=False,
+						action="store_true",
+						help=u"shutdown computer after installation")
+	parser.add_argument('-o', dest="startService", default=False,
+						action="store_true",
+						help=u"start opsiclientd service after installation")
+	parser.add_argument('-f', dest="hostFile", default=None,
+						help=u"file containing list of clients (one hostname per line)")
+	parser.add_argument('-S', dest="skipExistingClient", default=False,
+						action="store_true",
+						help=u"skip known opsi clients")
+	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
+						help=u"number of concurrent deployment threads")
+	parser.add_argument('--server-side-mount', dest="clientSideMount",
+						default=True, action="store_false",
+						help=u"Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
+	parser.add_argument('host', dest="hosts", action="append",
+						nargs=argparse.REMAINDER,
+						help='The hosts to deploy the opsi-client-agent to.')
 
-	# Get options
-	try:
-		(opts, args) = getopt.getopt(argv, "hVvcxsrou:p:f:St:", ["server-side-mount"])
+	args = parser.parse_args(argv)
 
-	except getopt.GetoptError:
-		usage()
-		sys.exit(1)
+	logger.setConsoleLevel(args.logLevel)
 
-	for (opt, arg) in opts:
-		if   (opt == "-h"):
-			usage()
-			return
-		elif (opt == "-V"):
-			print __version__
-			return
-		elif (opt == "-v"):
-			logLevel += 1
-			logger.setConsoleLevel(logLevel)
-		elif (opt == "-p"):
-			password = arg
-		elif (opt == "-u"):
-			username = arg
-		elif (opt == "-r"):
-			reboot = True
-		elif (opt == "-s"):
-			shutdown = True
-		elif (opt == "-o"):
-			startService = True
-		elif (opt == "-c"):
-			useNetbios = False
-		elif (opt == "-x"):
-			stopOnPingFailure = False
-		elif (opt == "-S"):
-			skipExistingClient = True
-		elif (opt == "-f"):
-			hostFile = arg
-			if not os.path.isfile(hostFile):
-				raise Exception(u"File '%s' not found!" % hostFile)
-		elif (opt == "-t"):
-			maxThreads = forceInt(arg)
-			if (maxThreads < 1):
-				maxThreads = 1
-		elif opt == "--server-side-mount":
-			clientSideMount = False
+	# TODO: check how we can handle hosts
+	hosts = list(args.hosts)
+	if args.hostFile:
+		if not os.path.isfile(args.hostFile):
+				raise Exception(u"File '%s' not found!" % args.hostFile)
 
-			if os.getuid() != 0:
-				raise Exception("You have to be root!")
-
-	if hostFile:
-		with open(hostFile) as f:
+		with open(args.hostFile) as f:
 			for line in f:
 				line = line.strip()
 				if not line or line.startswith('#') or line.startswith(';'):
@@ -664,20 +637,24 @@ def main(argv):
 
 				hosts.append(forceUnicodeLower(line))
 
-	elif (len(args) > 0):
-		hosts = args
-	else:
+	if not hosts:
 		raise Exception("No hosts given.")
 
-	if not username:
-		username = u'Administrator'
-
+	password = args.password
 	if not password:
 		password = forceUnicode(getpass.getpass())
 		if not password:
 			raise Exception("No password given.")
 
 	logger.addConfidentialString(password)
+
+	maxThreads = forceInt(args.maxThreads)
+	if maxThreads < 1:
+		maxThreads = 1
+
+	if not args.clientSideMount:
+		if os.getuid() != 0:
+			raise Exception("You have to be root to use server-side-mouting.")
 
 	# Create BackendManager
 	backend = BackendManager(
@@ -697,7 +674,17 @@ def main(argv):
 				runningThreads.remove(t)
 				break
 		host = hosts.pop()
-		t = DeployThread(host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient, clientSideMount)
+		t = DeployThread(host, backend,
+			args.username,
+			password,
+			args.shutdown,
+			args.reboot,
+			args.startService,
+			args.useNetbios,
+			args.stopOnPingFailure,
+			args.skipExistingClient,
+			args.clientSideMount
+		)
 		t.start()
 		runningThreads.append(t)
 		time.sleep(0.5)
@@ -705,7 +692,6 @@ def main(argv):
 	for t in runningThreads:
 		if t.isAlive():
 			t.join()
-	time.sleep(1)
 
 
 if (__name__ == "__main__"):
