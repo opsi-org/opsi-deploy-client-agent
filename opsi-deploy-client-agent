@@ -95,12 +95,12 @@ def winexe(cmd, host, username, password):
 		username = match.group(1) + u'\\' + match.group(2)
 
 	try:
-		winexe = which('winexe')
+		executable = which('winexe')
 	except Exception as error:
 		logger.debug('Getting winexe installed on system failed ({0}) Using local.'.format(error))
-		winexe = './winexe'
+		executable = './winexe'
 
-	return execute(u"%s -U '%s' //%s '%s'" % (winexe, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
+	return execute(u"%s -U '%s' //%s '%s'" % (executable, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
 
 
 class DeployThread(threading.Thread):
