@@ -122,27 +122,7 @@ class DeployThread(threading.Thread):
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
 
-			logger.notice(u"Querying for ip address of host '%s'" % hostId)
-			ipAddress = u''
-			logger.info(u"Getting host '%s' by name" % hostId)
-			try:
-				ipAddress = socket.gethostbyname(hostId)
-			except Exception, e:
-				logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, e))
-
-			if ipAddress:
-				logger.notice(u"Got ip address '%s' from syscall" % ipAddress)
-			else:
-				logger.info(u"Executing 'nmblookup %s#20'" % hostName)
-				for line in execute(u"nmblookup %s#20" % hostName):
-					match = re.search("^(\d+\.\d+\.\d+\.\d+)\s+%s<20>" % hostName, line, re.IGNORECASE)
-					if match:
-						ipAddress = match.group(1)
-						break
-				if ipAddress:
-					logger.notice(u"Got ip address '%s' from netbios lookup" % ipAddress)
-				else:
-					raise Exception(u"Failed to get ip address for host '%s'" % hostName)
+			ipAddress = self._getIpAddress(hostId)
 
 			logger.notice(u"Pinging host %s ..." % ipAddress)
 			alive = False
@@ -253,6 +233,32 @@ class DeployThread(threading.Thread):
 					self.backend.host_deleteObjects([hostObj])
 				except Exception, e2:
 					logger.error(e2)
+
+	@staticmethod
+	def _getIpAddress(hostId, hostName):
+		logger.notice(u"Querying for ip address of host '%s'" % hostId)
+		ipAddress = u''
+		logger.info(u"Getting host '%s' by name" % hostId)
+		try:
+			ipAddress = socket.gethostbyname(hostId)
+		except Exception, e:
+			logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, e))
+
+		if ipAddress:
+			logger.notice(u"Got ip address '%s' from syscall" % ipAddress)
+		else:
+			logger.info(u"Executing 'nmblookup %s#20'" % hostName)
+			for line in execute(u"nmblookup %s#20" % hostName):
+				match = re.search("^(\d+\.\d+\.\d+\.\d+)\s+%s<20>" % hostName, line, re.IGNORECASE)
+				if match:
+					ipAddress = match.group(1)
+					break
+			if ipAddress:
+				logger.notice(u"Got ip address '%s' from netbios lookup" % ipAddress)
+			else:
+				raise Exception(u"Failed to get ip address for host '%s'" % hostName)
+
+		return ipAddress
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
