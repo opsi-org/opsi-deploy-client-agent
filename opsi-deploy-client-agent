@@ -111,10 +111,7 @@ class DeployThread(threading.Thread):
 		hostCreated = False
 		try:
 			hostName = host.split('.')[0]
-			if (host.count(u'.') < 2):
-				hostId = forceHostId(host.replace('_', '-') + u'.' + u'.'.join(getFQDN().split(u'.')[1:]))
-			else:
-				hostId = forceHostId(host.replace('_', '-'))
+			hostId = self._getHostId(host)
 
 			if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 				logger.notice(u"Skipping host '%s'" % hostId)
@@ -218,6 +215,13 @@ class DeployThread(threading.Thread):
 					self.backend.host_deleteObjects([hostObj])
 				except Exception, e2:
 					logger.error(e2)
+
+	@staticmethod
+	def _getHostId(host):
+		if host.count(u'.') < 2:
+			return forceHostId(host.replace('_', '-') + u'.' + u'.'.join(getFQDN().split(u'.')[1:]))
+		else:
+			return forceHostId(host.replace('_', '-'))
 
 	@staticmethod
 	def _getIpAddress(hostId, hostName):
