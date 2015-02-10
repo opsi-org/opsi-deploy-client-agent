@@ -303,7 +303,7 @@ class DeployThread(threading.Thread):
 					continue
 
 				if line.split()[0] == ipAddress:
-					mac = line.split()[3].lower()
+					mac = line.split()[3].lower().strip()
 					break
 
 		if not mac or (mac == u'00:00:00:00:00:00'):
