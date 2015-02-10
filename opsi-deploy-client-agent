@@ -651,6 +651,9 @@ def main(argv):
 		elif opt == "--server-side-mount":
 			clientSideMount = False
 
+			if os.getuid() != 0:
+				raise Exception("You have to be root!")
+
 	if hostFile:
 		with open(hostFile) as f:
 			for line in f:
