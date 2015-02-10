@@ -188,16 +188,7 @@ class DeployThread(threading.Thread):
 					logger.error(e)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
-			self.backend.productOnClient_updateObjects([
-					ProductOnClient(
-						productType=u'LocalbootProduct',
-						clientId=hostId,
-						productId=u'opsi-client-agent',
-						installationStatus=u'installed',
-						actionResult=u'successful'
-					)
-				])
-
+			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation(hostId, hn)
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
@@ -297,6 +288,16 @@ class DeployThread(threading.Thread):
 				notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
 			)
 			self.backend.host_createObjects([hostObj])
+
+	def _setOpsiClientAgentToInstalled(self, hostId):
+		poc = ProductOnClient(
+			productType=u'LocalbootProduct',
+			clientId=hostId,
+			productId=u'opsi-client-agent',
+			installationStatus=u'installed',
+			actionResult=u'successful'
+		)
+		self.backend.productOnClient_updateObjects([poc])
 
 	def _finaliseInstallation(self, hostId, hn):
 		if self.useNetbios:
@@ -464,16 +465,7 @@ class DeployThread(threading.Thread):
 			mountDir = None
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
-			self.backend.productOnClient_updateObjects([
-					ProductOnClient(
-						productType=u'LocalbootProduct',
-						clientId=hostId,
-						productId=u'opsi-client-agent',
-						installationStatus=u'installed',
-						actionResult=u'successful'
-					)
-				])
-
+			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation(hostId, hostName)
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
