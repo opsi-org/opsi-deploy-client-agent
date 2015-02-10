@@ -161,22 +161,7 @@ class DeployThread(threading.Thread):
 				logger.warning(u"No ping response received from %s" % ipAddress)
 
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
-			mac = u''
-			f = open("/proc/net/arp")
-			for line in f.readlines():
-				line = line.strip()
-				if not line:
-					continue
-				if (line.split()[0] == ipAddress):
-					mac = line.split()[3].lower()
-					break
-			f.close()
-
-			if not mac or (mac == u'00:00:00:00:00:00'):
-				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
-				mac = u''
-			else:
-				logger.notice(u"Found hardware ethernet address '%s'" % mac)
+			mac = self._getMacAddress(ipAddress)
 
 			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
 				logger.notice(u"Creating client '%s'" % hostId)
@@ -306,6 +291,27 @@ class DeployThread(threading.Thread):
 				except Exception, e2:
 					logger.error(e2)
 
+	@staticmethod
+	def _getMacAddress(ipAddress):
+		mac = u''
+		with open("/proc/net/arp") as f:
+			for line in f:
+				line = line.strip()
+				if not line:
+					continue
+
+				if line.split()[0] == ipAddress:
+					mac = line.split()[3].lower()
+					break
+
+		if not mac or (mac == u'00:00:00:00:00:00'):
+			logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
+			mac = u''
+		else:
+			logger.notice(u"Found hardware ethernet address '%s'" % mac)
+
+		return mac
+
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
 		host = forceUnicodeLower(self.host)
@@ -369,22 +375,7 @@ class DeployThread(threading.Thread):
 				logger.warning(u"No ping response received from %s" % ipAddress)
 
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
-			mac = u''
-			f = open("/proc/net/arp")
-			for line in f.readlines():
-				line = line.strip()
-				if not line:
-					continue
-				if (line.split()[0] == ipAddress):
-					mac = line.split()[3].lower()
-					break
-			f.close()
-
-			if not mac or (mac == u'00:00:00:00:00:00'):
-				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
-				mac = u''
-			else:
-				logger.notice(u"Found hardware ethernet address '%s'" % mac)
+			mac = self._getMacAddress(ipAddress)
 
 			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
 				logger.notice(u"Creating client '%s'" % hostId)
