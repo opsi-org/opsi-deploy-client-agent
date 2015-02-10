@@ -175,7 +175,7 @@ class DeployThread(threading.Thread):
 				)
 				self.backend.host_createObjects([hostObj])
 				hostCreated = True
-			hostObj = self.backend.host_getObjects(type = 'OpsiClient', id = hostId)[0]
+			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			hn = hostId
 			if self.useNetbios:
