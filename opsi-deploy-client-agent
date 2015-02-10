@@ -46,8 +46,9 @@ import time
 from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR
 from OPSI.Object import OpsiClient, ProductOnClient
-from OPSI.System import execute, which, getFQDN
+from OPSI.System import copy, execute, getFQDN, which
 from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
+from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
 
 __version__ = '4.0.6.1'
@@ -327,7 +328,6 @@ class DeployThread(threading.Thread):
 				except Exception, e2:
 					logger.error(e2)
 
-
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
 		host = forceUnicodeLower(self.host)
@@ -591,7 +591,6 @@ class DeployThread(threading.Thread):
 					os.rmdir(mountDir)
 				except Exception, e2:
 					logger.error(e2)
-
 
 
 def main(argv):
