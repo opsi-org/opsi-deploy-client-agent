@@ -713,11 +713,7 @@ if (__name__ == "__main__"):
 	try:
 		os.chdir( os.path.dirname(os.path.abspath(sys.argv[0])) )
 		main(sys.argv[1:])
-
-	except SystemExit:
-		pass
-
-	except Exception, e:
+	except Exception as e:
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(e)
 		print >> sys.stderr, u"ERROR: %s" % forceUnicode(e)
