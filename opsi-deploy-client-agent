@@ -97,7 +97,7 @@ def winexe(cmd, host, username, password):
 	try:
 		winexe = which('winexe')
 	except Exception as error:
-		logger.debug('Getting winexe installed on system failed. Using local.')
+		logger.debug('Getting winexe installed on system failed ({0}) Using local.'.format(error))
 		winexe = './winexe'
 
 	return execute(u"%s -U '%s' //%s '%s'" % (winexe, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
