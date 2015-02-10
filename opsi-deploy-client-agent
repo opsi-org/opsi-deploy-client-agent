@@ -33,8 +33,6 @@
    @license: GNU General Public License version 2
 """
 
-__version__ = '4.0.6.1'
-
 import getopt
 import getpass
 import inspect
@@ -52,6 +50,8 @@ from OPSI.System import *
 from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
 from OPSI.Util import *
 from OPSI.Util.File import IniFile
+
+__version__ = '4.0.6.1'
 
 
 logger = Logger()
