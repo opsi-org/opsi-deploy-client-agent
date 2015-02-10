@@ -319,6 +319,272 @@ class DeployThread(threading.Thread):
 					logger.error(e2)
 
 
+	def _installWithServersideMount(self):
+		logger.debug('Installing using server-side mount.')
+		host = forceUnicodeLower(self.host)
+		hostId = u''
+		hostObj = None
+		mountDir = u''
+		instDir = u''
+		hostCreated = False
+		mountDirCreated = False
+		instDirCreated = False
+		mounted = False
+		try:
+			if (host.count(u'.') < 2):
+				hostId = forceHostId(host + u'.' + u'.'.join(getFQDN().split(u'.')[1:]))
+			else:
+				hostId = forceHostId(host)
+			hostName = hostId.split('.')[0]
+
+			if self.backend.host_getIdents(type = 'OpsiClient', id = hostId) and self.skipExistingClient:
+				logger.notice(u"Skipping host '%s'" % hostId)
+				return
+
+			logger.notice(u"Starting deployment to host '%s'" % hostId)
+
+			logger.notice(u"Querying for ip address of host '%s'" % hostId)
+			ipAddress = u''
+			logger.info(u"Getting host '%s' by name" % hostId)
+			try:
+				ipAddress = socket.gethostbyname(hostId)
+			except Exception, e:
+				logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, e))
+
+			if ipAddress:
+				logger.notice(u"Got ip address '%s' from syscall" % ipAddress)
+			else:
+				logger.info(u"Executing 'nmblookup %s#20'" % hostName)
+				for line in execute(u"nmblookup %s#20" % hostName):
+					match = re.search("^(\d+\.\d+\.\d+\.\d+)\s+%s<20>" % hostName, line, re.IGNORECASE)
+					if match:
+						ipAddress = match.group(1)
+						break
+				if ipAddress:
+					logger.notice(u"Got ip address '%s' from netbios lookup" % ipAddress)
+				else:
+					raise Exception(u"Failed to get ip address for host '%s'" % hostName)
+
+			logger.notice(u"Pinging host %s ..." % ipAddress)
+			alive = False
+			try:
+				for line in execute(u"ping -q -c2 %s" % ipAddress):
+					match = re.search("\s+(\d+)%\s+packet\s+loss", line)
+					if match and (forceInt(match.group(1)) < 100):
+						alive = True
+			except Exception, e:
+				logger.error(e)
+			if alive:
+				logger.notice(u"Host %s is up" % ipAddress)
+			elif self.stopOnPingFailure:
+				raise Exception(u"No ping response received from %s" % ipAddress)
+			else:
+				logger.warning(u"No ping response received from %s" % ipAddress)
+
+			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
+			mac = u''
+			f = open("/proc/net/arp")
+			for line in f.readlines():
+				line = line.strip()
+				if not line:
+					continue
+				if (line.split()[0] == ipAddress):
+					mac = line.split()[3].lower()
+					break
+			f.close()
+
+			if not mac or (mac == u'00:00:00:00:00:00'):
+				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
+				mac = u''
+			else:
+				logger.notice(u"Found hardware ethernet address '%s'" % mac)
+
+			if not self.backend.host_getIdents(type = 'OpsiClient', id = hostId):
+				logger.notice(u"Creating client '%s'" % hostId)
+
+				hostObj = OpsiClient(
+					id              = hostId,
+					hardwareAddress = mac,
+					ipAddress       = ipAddress,
+					description     = u"",
+					notes           = u"Created by opsi-deploy-client-agent at %s" \
+								% time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+				)
+				self.backend.host_createObjects([hostObj])
+				hostCreated = True
+			hostObj = self.backend.host_getObjects(type = 'OpsiClient', id = hostId)[0]
+
+			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
+			instDirName = u'opsi_' + randomString(10)
+			instDir = os.path.join(mountDir, instDirName)
+
+			os.makedirs(mountDir)
+			mountDirCreated = True
+
+			logger.notice(u"Mounting c$ share")
+			try:
+				try:
+					if self.useNetbios:
+						if "timeout" in inspect.getargspec(execute)[0]:
+							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
+						else:
+							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
+					else:
+						if "timeout" in inspect.getargspec(execute)[0]:
+							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
+						else:
+							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
+				except Exception, e:
+					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % e)
+					if self.useNetbios:
+						if "timeout" in inspect.getargspec(execute)[0]:
+							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
+						else:
+							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
+					else:
+						if "timeout" in inspect.getargspec(execute)[0]:
+							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
+						else:
+							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
+			except Exception, e:
+				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % e)
+
+			mounted = True
+
+			logger.notice(u"Copying installation files")
+
+			os.makedirs(instDir)
+			instDirCreated = True
+
+			copy(u'files', instDir)
+			copy(u'utils', instDir)
+
+			logger.notice(u"Patching config.ini")
+			configFile = IniFile(os.path.join(instDir, u'files', u'opsi', u'cfg', u'config.ini'))
+			config = configFile.parse()
+			if not config.has_section('shareinfo'):
+				config.add_section('shareinfo')
+			config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
+			if not config.has_section('general'):
+				config.add_section('general')
+			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
+			configFile.generate(config)
+
+			logger.notice(u"Installing opsi-client-agent")
+			if not os.path.exists(os.path.join(mountDir, 'tmp')):
+				os.makedirs(os.path.join(mountDir, 'tmp'))
+			cmd = u'c:\\%s\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\%s\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY' % (instDirName, instDirName)
+			for trynum in (1, 2):
+				try:
+					if self.useNetbios:
+						winexe(cmd, hostName, self.username, self.password)
+					else:
+						winexe(cmd, hostId, self.username, self.password)
+					break
+				except Exception, e:
+					if (trynum == 2):
+						raise Exception(u"Failed to install opsi-client-agent: %s" % e)
+					logger.info(u"Winexe failure '%s', retrying" % e)
+					time.sleep(2)
+
+			logger.notice(u"Cleaning up")
+			shutil.rmtree(instDir)
+			instDir = None
+			umount(mountDir)
+			mounted = False
+			os.rmdir(mountDir)
+			mountDir = None
+
+			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			self.backend.productOnClient_updateObjects([
+					ProductOnClient(
+						productType        = u'LocalbootProduct',
+						clientId           = hostId,
+						productId          = u'opsi-client-agent',
+						installationStatus = u'installed',
+						actionResult       = u'successful'
+					)
+				])
+
+			if self.reboot or self.shutdown:
+				cmd = u''
+				if self.reboot:
+					logger.notice(u"Rebooting machine '%s'" % hostId)
+					cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
+				elif self.shutdown:
+					logger.notice(u"Shutting down machine '%s'" % hostId)
+					cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
+				try:
+					pf = None
+					for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
+						lines = []
+						try:
+							if self.useNetbios:
+								lines = winexe(u'cmd.exe /C "echo %s"' % const, hostName, self.username, self.password)
+							else:
+								lines = winexe(u'cmd.exe /C "echo %s"' % const, hostId, self.username, self.password)
+						except Exception, e:
+							logger.warning(e)
+							continue
+						for line in lines:
+							line = line.strip()
+							if (line.find('unavailable') != -1):
+								continue
+							pf = line
+						if pf and (pf != const):
+							break
+						pf = None
+					if not pf:
+						raise Exception(u"Failed to get program files path")
+					logger.info(u"Program files path is '%s'" % pf)
+					if self.useNetbios:
+						winexe(cmd.replace(u'%ProgramFiles%', pf), hostName, self.username, self.password)
+					else:
+						winexe(cmd.replace(u'%ProgramFiles%', pf), hostId, self.username, self.password)
+				except Exception, e:
+					if self.reboot:
+						logger.error(u"Failed to reboot computer: %s" % e)
+					else:
+						logger.error(u"Failed to shutdown computer: %s" % e)
+			elif self.startService:
+				if self.useNetbios:
+					winexe(u'net start opsiclientd', hostName, self.username, self.password)
+				else:
+					winexe(u'net start opsiclientd', hostId, self.username, self.password)
+
+		except Exception, e:
+			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
+			if hostObj and hostCreated:
+				try:
+					self.backend.host_deleteObjects([hostObj])
+				except Exception, e2:
+					logger.error(e2)
+			if instDir and instDirCreated:
+				try:
+					shutil.rmtree(instDir)
+				except Exception, e2:
+					logger.error(e2)
+			if mountDir and mounted:
+				try:
+					umount(mountDir)
+				except Exception, e2:
+					logger.error(e2)
+			if mountDir and mountDirCreated:
+				try:
+					os.rmdir(mountDir)
+				except Exception, e2:
+					logger.error(e2)
+
+
+
 def main(argv):
 	global logLevel
 	hosts = []
