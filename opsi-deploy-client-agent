@@ -720,10 +720,10 @@ def main(argv):
 			t.join()
 	time.sleep(1)
 
-if (__name__ == "__main__"):
 
+if (__name__ == "__main__"):
 	try:
-		os.chdir( os.path.dirname(os.path.abspath(sys.argv[0])) )
+		os.chdir(os.path.dirname(os.path.abspath(__file__)))
 		main(sys.argv[1:])
 	except Exception as e:
 		logger.setConsoleLevel(LOG_ERROR)
