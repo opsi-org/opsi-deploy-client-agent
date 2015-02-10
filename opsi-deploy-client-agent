@@ -626,7 +626,7 @@ def main(argv):
 if (__name__ == "__main__"):
 	try:
 		os.chdir(os.path.dirname(os.path.abspath(__file__)))
-		main(sys.argv[1:])
+		main(sys.argv)
 	except Exception as e:
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(e)
