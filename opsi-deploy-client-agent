@@ -85,20 +85,22 @@ def usage():
 
 
 def winexe(cmd, host, username, password):
-	cmd      = forceUnicode(cmd)
-	host     = forceUnicode(host)
+	cmd = forceUnicode(cmd)
+	host = forceUnicode(host)
 	username = forceUnicode(username)
 	password = forceUnicode(password)
 
 	match = re.search('^([^\\\\]+)\\\\+([^\\\\]+)$', username)
 	if match:
 		username = match.group(1) + u'\\' + match.group(2)
-	winexe = './winexe'
+
 	try:
 		winexe = which('winexe')
-	except:
-		pass
-	return execute( u"%s -U '%s' //%s '%s'" % (winexe, username + '%' + password.replace("'", "'\"'\"'"), host, cmd) )
+	except Exception as error:
+		logger.debug('Getting winexe installed on system failed. Using local.')
+		winexe = './winexe'
+
+	return execute(u"%s -U '%s' //%s '%s'" % (winexe, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
 
 
 class DeployThread(threading.Thread):
