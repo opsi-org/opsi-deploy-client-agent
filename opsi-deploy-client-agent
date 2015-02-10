@@ -4,35 +4,35 @@
    = = = = = = = = = = = = = = = = = =
    =   opsi-deploy-client-agent    =
    = = = = = = = = = = = = = = = = = =
-   
+
    This tool is part of the desktop management solution opsi
    (open pc server integration) http://www.opsi.org
-   
-   Copyright (C) 2007-2010 uib GmbH
-   
+
+   Copyright (C) 2007-2015 uib GmbH
+
    http://www.uib.de/
-   
+
    All rights reserved.
-   
+
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License version 2 as
    published by the Free Software Foundation.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-   
+
    @copyright:	uib GmbH <info@uib.de>
    @author: Jan Schneider <j.schneider@uib.de>
    @license: GNU General Public License version 2
 """
 
-__version__ = '4.0.1.4'
+__version__ = '4.0.6.1'
 
 import sys, os, socket, time, gettext, getopt, getpass, re, threading, inspect
 
@@ -90,7 +90,7 @@ def winexe(cmd, host, username, password):
 	host     = forceUnicode(host)
 	username = forceUnicode(username)
 	password = forceUnicode(password)
-	
+
 	match = re.search('^([^\\\\]+)\\\\+([^\\\\]+)$', username)
 	if match:
 		username = match.group(1) + u'\\' + match.group(2)
@@ -114,7 +114,7 @@ class DeployThread(threading.Thread):
 		self.useNetbios = useNetbios
 		self.stopOnPingFailure = stopOnPingFailure
 		self.skipExistingClient = skipExistingClient
-		
+
 	def run(self):
 		host = forceUnicodeLower(self.host)
 		hostId = u''
@@ -126,13 +126,13 @@ class DeployThread(threading.Thread):
 				hostId = forceHostId(host.replace('_', '-') + u'.' + u'.'.join(getFQDN().split(u'.')[1:]))
 			else:
 				hostId = forceHostId(host.replace('_', '-'))
-			
+
 			if self.backend.host_getIdents(type = 'OpsiClient', id = hostId) and self.skipExistingClient:
 				logger.notice(u"Skipping host '%s'" % hostId)
 				return
-			
+
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
-			
+
 			logger.notice(u"Querying for ip address of host '%s'" % hostId)
 			ipAddress = u''
 			logger.info(u"Getting host '%s' by name" % hostId)
@@ -140,7 +140,7 @@ class DeployThread(threading.Thread):
 				ipAddress = socket.gethostbyname(hostId)
 			except Exception, e:
 				logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, e))
-			
+
 			if ipAddress:
 				logger.notice(u"Got ip address '%s' from syscall" % ipAddress)
 			else:
@@ -154,7 +154,7 @@ class DeployThread(threading.Thread):
 					logger.notice(u"Got ip address '%s' from netbios lookup" % ipAddress)
 				else:
 					raise Exception(u"Failed to get ip address for host '%s'" % hostName)
-			
+
 			logger.notice(u"Pinging host %s ..." % ipAddress)
 			alive = False
 			try:
@@ -170,7 +170,7 @@ class DeployThread(threading.Thread):
 				raise Exception(u"No ping response received from %s" % ipAddress)
 			else:
 				logger.warning(u"No ping response received from %s" % ipAddress)
-			
+
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
 			mac = u''
 			f = open("/proc/net/arp")
@@ -182,16 +182,16 @@ class DeployThread(threading.Thread):
 					mac = line.split()[3].lower()
 					break
 			f.close()
-			
+
 			if not mac or (mac == u'00:00:00:00:00:00'):
 				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
 				mac = u''
 			else:
 				logger.notice(u"Found hardware ethernet address '%s'" % mac)
-			
+
 			if not self.backend.host_getIdents(type = 'OpsiClient', id = hostId):
 				logger.notice(u"Creating client '%s'" % hostId)
-				
+
 				hostObj = OpsiClient(
 					id              = hostId,
 					hardwareAddress = mac,
@@ -203,11 +203,11 @@ class DeployThread(threading.Thread):
 				self.backend.host_createObjects([hostObj])
 				hostCreated = True
 			hostObj = self.backend.host_getObjects(type = 'OpsiClient', id = hostId)[0]
-			
+
 			hn = hostId
 			if self.useNetbios:
 				hn = hostName
-			
+
 			logger.notice(u"Testing winexe")
 			cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
 			for trynum in (1, 2):
@@ -219,7 +219,7 @@ class DeployThread(threading.Thread):
 						raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (hn, e))
 					logger.info(u"Winexe failure '%s', retrying" % e)
 					time.sleep(2)
-			
+
 			logger.notice(u"Patching config.ini")
 			configIniName = u'%s_config.ini' % randomString(10)
 			copy(os.path.join(u'files', u'opsi', u'cfg', u'config.ini'), '/tmp/%s' % configIniName)
@@ -232,13 +232,13 @@ class DeployThread(threading.Thread):
 				config.add_section('general')
 			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
 			configFile.generate(config)
-			
+
 			try:
 				logger.notice(u"Copying installation files")
 				cmd = u"%s //%s/c$ -U '%s' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put %s config.ini; exit;'" \
 					% (which('smbclient'), hn, self.username + '%' + self.password.replace("'", "'\"'\"'"), configIniName)
 				execute(cmd)
-				
+
 				logger.notice(u"Installing opsi-client-agent")
 				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
 				for trynum in (1, 2):
@@ -252,13 +252,13 @@ class DeployThread(threading.Thread):
 						time.sleep(2)
 			finally:
 				os.remove('/tmp/%s' % configIniName)
-				
+
 				try:
 					cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst"'
 					winexe(cmd, hn, self.username, self.password)
 				except Exception, e:
 					logger.error(e)
-			
+
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self.backend.productOnClient_updateObjects([
 					ProductOnClient(
@@ -269,7 +269,7 @@ class DeployThread(threading.Thread):
 						actionResult       = u'successful'
 					)
 				])
-			
+
 			if self.reboot or self.shutdown:
 				cmd = u''
 				if self.reboot:
@@ -309,7 +309,7 @@ class DeployThread(threading.Thread):
 					winexe(u'net start opsiclientd', hn, self.username, self.password)
 				except Exception, e:
 					logger.error(u"Failed to start opsiclientd: %s" % e)
-				
+
 		except Exception, e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
 			if hostObj and hostCreated:
@@ -318,7 +318,7 @@ class DeployThread(threading.Thread):
 				except Exception, e2:
 					logger.error(e2)
 
-		
+
 def main(argv):
 	global logLevel
 	hosts = []
@@ -332,15 +332,15 @@ def main(argv):
 	stopOnPingFailure = True
 	skipExistingClient = False
 	maxThreads = 1
-	
+
 	# Get options
 	try:
 		(opts, args) = getopt.getopt(argv, "hVvcxsrou:p:f:St:")
-	
+
 	except getopt.GetoptError:
 		usage()
 		sys.exit(1)
-	
+
 	for (opt, arg) in opts:
 		if   (opt == "-h"):
 			usage()
@@ -375,32 +375,31 @@ def main(argv):
 			maxThreads = forceInt(arg)
 			if (maxThreads < 1):
 				maxThreads = 1
-			
+
 	if hostFile:
-		f = open(hostFile)
-		for line in f.readlines():
-			line = line.strip()
-			if not line or line.startswith('#') or line.startswith(';'):
-				continue
-			hosts.append(forceUnicodeLower(line))
-		f.close()
-		
+		with open(hostFile) as f:
+			for line in f:
+				line = line.strip()
+				if not line or line.startswith('#') or line.startswith(';'):
+					continue
+
+				hosts.append(forceUnicodeLower(line))
+
 	elif (len(args) > 0):
 		hosts = args
-	
 	else:
 		raise Exception("No hosts given.")
-	
+
 	if not username:
 		username = u'Administrator'
-	
+
 	if not password:
 		password = forceUnicode(getpass.getpass())
 		if not password:
 			raise Exception("No password given.")
-		
+
 	logger.addConfidentialString(password)
-	
+
 	# Create BackendManager
 	backend = BackendManager(
 		dispatchConfigFile = u'/etc/opsi/backendManager/dispatch.conf',
@@ -423,28 +422,25 @@ def main(argv):
 		t.start()
 		runningThreads.append(t)
 		time.sleep(0.5)
-		
+
 	for t in runningThreads:
 		if t.isAlive():
 			t.join()
-	time.sleep(1)	
-		
+	time.sleep(1)
+
 if (__name__ == "__main__"):
-	
+
 	try:
 		os.chdir( os.path.dirname(os.path.abspath(sys.argv[0])) )
 		main(sys.argv[1:])
-		
+
 	except SystemExit:
 		pass
-		
+
 	except Exception, e:
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(e)
 		print >> sys.stderr, u"ERROR: %s" % forceUnicode(e)
 		sys.exit(1)
-	
+
 	sys.exit(0)
-
-
-
