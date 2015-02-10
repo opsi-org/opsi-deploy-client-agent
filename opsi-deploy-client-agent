@@ -128,18 +128,8 @@ class DeployThread(threading.Thread):
 			if not mac:
 				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
 
-			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
-				logger.notice(u"Creating client '%s'" % hostId)
-
-				hostObj = OpsiClient(
-					id=hostId,
-					hardwareAddress=mac,
-					ipAddress=ipAddress,
-					description=u"",
-					notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
-				)
-				self.backend.host_createObjects([hostObj])
-				hostCreated = True
+			self._createHostIfNotExisting(hostId, mac, ipAddress)
+			hostCreated = True
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			hn = hostId
@@ -295,6 +285,19 @@ class DeployThread(threading.Thread):
 
 		return mac
 
+	def _createHostIfNotExisting(self, hostId, mac, ipAddress):
+		if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
+			logger.notice(u"Creating client '%s'" % hostId)
+
+			hostObj = OpsiClient(
+				id=hostId,
+				hardwareAddress=mac,
+				ipAddress=ipAddress,
+				description=u"",
+				notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+			)
+			self.backend.host_createObjects([hostObj])
+
 	def _finaliseInstallation(self, hostId, hn):
 		if self.useNetbios:
 			hostName = hn
@@ -367,18 +370,8 @@ class DeployThread(threading.Thread):
 			if not mac:
 				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
 
-			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
-				logger.notice(u"Creating client '%s'" % hostId)
-
-				hostObj = OpsiClient(
-					id=hostId,
-					hardwareAddress=mac,
-					ipAddress=ipAddress,
-					description=u"",
-					notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
-				)
-				self.backend.host_createObjects([hostObj])
-				hostCreated = True
+			self._createHostIfNotExisting(hostId, mac, ipAddress)
+			hostCreated = True
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
