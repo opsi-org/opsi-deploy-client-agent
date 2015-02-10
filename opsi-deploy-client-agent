@@ -36,6 +36,7 @@ import getpass
 import inspect
 import os
 import re
+import shutil
 import socket
 import sys
 import threading
@@ -44,7 +45,7 @@ import time
 from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR
 from OPSI.Object import OpsiClient, ProductOnClient
-from OPSI.System import copy, execute, getFQDN, which
+from OPSI.System import copy, execute, getFQDN, umount, which
 from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
 from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
