@@ -116,7 +116,7 @@ class DeployThread(threading.Thread):
 			else:
 				hostId = forceHostId(host.replace('_', '-'))
 
-			if self.backend.host_getIdents(type = 'OpsiClient', id = hostId) and self.skipExistingClient:
+			if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 				logger.notice(u"Skipping host '%s'" % hostId)
 				return
 
@@ -178,16 +178,15 @@ class DeployThread(threading.Thread):
 			else:
 				logger.notice(u"Found hardware ethernet address '%s'" % mac)
 
-			if not self.backend.host_getIdents(type = 'OpsiClient', id = hostId):
+			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
 				logger.notice(u"Creating client '%s'" % hostId)
 
 				hostObj = OpsiClient(
-					id              = hostId,
-					hardwareAddress = mac,
-					ipAddress       = ipAddress,
-					description     = u"",
-					notes           = u"Created by opsi-deploy-client-agent at %s" \
-								% time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+					id=hostId,
+					hardwareAddress=mac,
+					ipAddress=ipAddress,
+					description=u"",
+					notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
 				)
 				self.backend.host_createObjects([hostObj])
 				hostCreated = True
@@ -251,11 +250,11 @@ class DeployThread(threading.Thread):
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self.backend.productOnClient_updateObjects([
 					ProductOnClient(
-						productType        = u'LocalbootProduct',
-						clientId           = hostId,
-						productId          = u'opsi-client-agent',
-						installationStatus = u'installed',
-						actionResult       = u'successful'
+						productType=u'LocalbootProduct',
+						clientId=hostId,
+						productId=u'opsi-client-agent',
+						installationStatus=u'installed',
+						actionResult=u'successful'
 					)
 				])
 
@@ -325,7 +324,7 @@ class DeployThread(threading.Thread):
 				hostId = forceHostId(host)
 			hostName = hostId.split('.')[0]
 
-			if self.backend.host_getIdents(type = 'OpsiClient', id = hostId) and self.skipExistingClient:
+			if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 				logger.notice(u"Skipping host '%s'" % hostId)
 				return
 
@@ -387,20 +386,19 @@ class DeployThread(threading.Thread):
 			else:
 				logger.notice(u"Found hardware ethernet address '%s'" % mac)
 
-			if not self.backend.host_getIdents(type = 'OpsiClient', id = hostId):
+			if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
 				logger.notice(u"Creating client '%s'" % hostId)
 
 				hostObj = OpsiClient(
-					id              = hostId,
-					hardwareAddress = mac,
-					ipAddress       = ipAddress,
-					description     = u"",
-					notes           = u"Created by opsi-deploy-client-agent at %s" \
-								% time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+					id=hostId,
+					hardwareAddress=mac,
+					ipAddress=ipAddress,
+					description=u"",
+					notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
 				)
 				self.backend.host_createObjects([hostObj])
 				hostCreated = True
-			hostObj = self.backend.host_getObjects(type = 'OpsiClient', id = hostId)[0]
+			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
 			instDirName = u'opsi_' + randomString(10)
@@ -414,33 +412,33 @@ class DeployThread(threading.Thread):
 				try:
 					if self.useNetbios:
 						if "timeout" in inspect.getargspec(execute)[0]:
-							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
 						else:
-							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
 					else:
 						if "timeout" in inspect.getargspec(execute)[0]:
-							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
 						else:
-							execute( u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
 				except Exception, e:
 					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % e)
 					if self.useNetbios:
 						if "timeout" in inspect.getargspec(execute)[0]:
-							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
 						else:
-							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
 					else:
 						if "timeout" in inspect.getargspec(execute)[0]:
-							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
 						else:
-							execute( u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
 								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
 			except Exception, e:
 				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % e)
@@ -494,11 +492,11 @@ class DeployThread(threading.Thread):
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self.backend.productOnClient_updateObjects([
 					ProductOnClient(
-						productType        = u'LocalbootProduct',
-						clientId           = hostId,
-						productId          = u'opsi-client-agent',
-						installationStatus = u'installed',
-						actionResult       = u'successful'
+						productType=u'LocalbootProduct',
+						clientId=hostId,
+						productId=u'opsi-client-agent',
+						installationStatus=u'installed',
+						actionResult=u'successful'
 					)
 				])
 
@@ -658,11 +656,11 @@ def main(argv):
 
 	# Create BackendManager
 	backend = BackendManager(
-		dispatchConfigFile = u'/etc/opsi/backendManager/dispatch.conf',
-		backendConfigDir   = u'/etc/opsi/backends',
-		extend             = True,
-		depotbackend       = False,
-		hostControlBackend = False
+		dispatchConfigFile=u'/etc/opsi/backendManager/dispatch.conf',
+		backendConfigDir=u'/etc/opsi/backends',
+		extend=True,
+		depotbackend=False,
+		hostControlBackend=False
 	)
 	runningThreads = []
 	while hosts:
