@@ -354,22 +354,7 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
 
 			ipAddress = self._getIpAddress(hostId, hostName)
-
-			logger.notice(u"Pinging host %s ..." % ipAddress)
-			alive = False
-			try:
-				for line in execute(u"ping -q -c2 %s" % ipAddress):
-					match = re.search("\s+(\d+)%\s+packet\s+loss", line)
-					if match and (forceInt(match.group(1)) < 100):
-						alive = True
-			except Exception, e:
-				logger.error(e)
-			if alive:
-				logger.notice(u"Host %s is up" % ipAddress)
-			elif self.stopOnPingFailure:
-				raise Exception(u"No ping response received from %s" % ipAddress)
-			else:
-				logger.warning(u"No ping response received from %s" % ipAddress)
+			self._pingClient(ipAddress)
 
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
 			mac = self._getMacAddress(ipAddress)
