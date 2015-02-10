@@ -83,7 +83,9 @@ def usage():
 	print _(u"    -f        file containing list of clients (one hostname per line)")
 	print _(u"    -S        skip known opsi clients")
 	print _(u"    -t        number of concurrent deployment threads (default: 1)")
+	print _(u"    --server-side-mount    Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
 	print ""
+
 
 def winexe(cmd, host, username, password):
 	cmd      = forceUnicode(cmd)
@@ -101,8 +103,9 @@ def winexe(cmd, host, username, password):
 		pass
 	return execute( u"%s -U '%s' //%s '%s'" % (winexe, username + '%' + password.replace("'", "'\"'\"'"), host, cmd) )
 
+
 class DeployThread(threading.Thread):
-	def __init__(self, host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient):
+	def __init__(self, host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient, clientSideMount=True):
 		threading.Thread.__init__(self)
 		self.host = host
 		self.backend = backend
@@ -114,8 +117,16 @@ class DeployThread(threading.Thread):
 		self.useNetbios = useNetbios
 		self.stopOnPingFailure = stopOnPingFailure
 		self.skipExistingClient = skipExistingClient
+		self.clientSideMount = clientSideMount
 
 	def run(self):
+		if self.clientSideMount:
+			self._installWithClientSideMount()
+		else:
+			self._installWithServersideMount()
+
+	def _installWithClientSideMount(self):
+		logger.debug('Installing using client-side mount.')
 		host = forceUnicodeLower(self.host)
 		hostId = u''
 		hostObj = None
@@ -598,10 +609,11 @@ def main(argv):
 	stopOnPingFailure = True
 	skipExistingClient = False
 	maxThreads = 1
+	clientSideMount = True
 
 	# Get options
 	try:
-		(opts, args) = getopt.getopt(argv, "hVvcxsrou:p:f:St:")
+		(opts, args) = getopt.getopt(argv, "hVvcxsrou:p:f:St:", ["server-side-mount"])
 
 	except getopt.GetoptError:
 		usage()
@@ -641,6 +653,8 @@ def main(argv):
 			maxThreads = forceInt(arg)
 			if (maxThreads < 1):
 				maxThreads = 1
+		elif opt == "--server-side-mount":
+			clientSideMount = False
 
 	if hostFile:
 		with open(hostFile) as f:
@@ -684,7 +698,7 @@ def main(argv):
 				runningThreads.remove(t)
 				break
 		host = hosts.pop()
-		t = DeployThread(host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient)
+		t = DeployThread(host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient, clientSideMount)
 		t.start()
 		runningThreads.append(t)
 		time.sleep(0.5)
