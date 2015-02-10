@@ -275,20 +275,25 @@ class DeployThread(threading.Thread):
 		return mac
 
 	def _finaliseInstallation(self, hostId, hn):
+		if self.useNetbios:
+			hostName = hn
+		else:
+			hostName = hostId
+
 		if self.reboot or self.shutdown:
 			cmd = u''
 			if self.reboot:
-				logger.notice(u"Rebooting machine '%s'" % hostId)
+				logger.notice(u"Rebooting machine '%s'" % hostName)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
 			elif self.shutdown:
-				logger.notice(u"Shutting down machine '%s'" % hostId)
+				logger.notice(u"Shutting down machine '%s'" % hostName)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
 			try:
 				pf = None
 				for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
 					lines = []
 					try:
-						lines = winexe(u'cmd.exe /C "echo %s"' % const, hn, self.username, self.password)
+						lines = winexe(u'cmd.exe /C "echo %s"' % const, hostName, self.username, self.password)
 					except Exception, e:
 						logger.warning(e)
 						continue
@@ -303,7 +308,7 @@ class DeployThread(threading.Thread):
 				if not pf:
 					raise Exception(u"Failed to get program files path")
 				logger.info(u"Program files path is '%s'" % pf)
-				winexe(cmd.replace(u'%ProgramFiles%', pf), hn, self.username, self.password)
+				winexe(cmd.replace(u'%ProgramFiles%', pf), hostName, self.username, self.password)
 			except Exception, e:
 				if self.reboot:
 					logger.error(u"Failed to reboot computer: %s" % e)
@@ -311,9 +316,9 @@ class DeployThread(threading.Thread):
 					logger.error(u"Failed to shutdown computer: %s" % e)
 		elif self.startService:
 			try:
-				winexe(u'net start opsiclientd', hn, self.username, self.password)
-			except Exception, e:
-				logger.error(u"Failed to start opsiclientd: %s" % e)
+				winexe(u'net start opsiclientd', hostName, self.username, self.password)
+			except Exception as error:
+				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=hostName, error=error))
 
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
@@ -496,52 +501,7 @@ class DeployThread(threading.Thread):
 					)
 				])
 
-			if self.reboot or self.shutdown:
-				cmd = u''
-				if self.reboot:
-					logger.notice(u"Rebooting machine '%s'" % hostId)
-					cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
-				elif self.shutdown:
-					logger.notice(u"Shutting down machine '%s'" % hostId)
-					cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
-				try:
-					pf = None
-					for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
-						lines = []
-						try:
-							if self.useNetbios:
-								lines = winexe(u'cmd.exe /C "echo %s"' % const, hostName, self.username, self.password)
-							else:
-								lines = winexe(u'cmd.exe /C "echo %s"' % const, hostId, self.username, self.password)
-						except Exception, e:
-							logger.warning(e)
-							continue
-						for line in lines:
-							line = line.strip()
-							if (line.find('unavailable') != -1):
-								continue
-							pf = line
-						if pf and (pf != const):
-							break
-						pf = None
-					if not pf:
-						raise Exception(u"Failed to get program files path")
-					logger.info(u"Program files path is '%s'" % pf)
-					if self.useNetbios:
-						winexe(cmd.replace(u'%ProgramFiles%', pf), hostName, self.username, self.password)
-					else:
-						winexe(cmd.replace(u'%ProgramFiles%', pf), hostId, self.username, self.password)
-				except Exception, e:
-					if self.reboot:
-						logger.error(u"Failed to reboot computer: %s" % e)
-					else:
-						logger.error(u"Failed to shutdown computer: %s" % e)
-			elif self.startService:
-				if self.useNetbios:
-					winexe(u'net start opsiclientd', hostName, self.username, self.password)
-				else:
-					winexe(u'net start opsiclientd', hostId, self.username, self.password)
-
+			self._finaliseInstallation(hostId, hostName)
 		except Exception, e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
 			if hostObj and hostCreated:
