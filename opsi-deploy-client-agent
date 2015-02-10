@@ -227,7 +227,7 @@ class DeployThread(threading.Thread):
 		else:
 			return forceHostId(host)
 
-	def _checkIfClientShouldBeSkipped(hostId):
+	def _checkIfClientShouldBeSkipped(self, hostId):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 			raise SkipClientException("Client {0} exists.".format(hostId))
 
