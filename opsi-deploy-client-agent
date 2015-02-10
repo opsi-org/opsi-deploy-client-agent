@@ -82,6 +82,10 @@ def winexe(cmd, host, username, password):
 	return execute(u"%s -U '%s' //%s '%s'" % (executable, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
 
 
+class SkipClientException(Exception):
+	pass
+
+
 class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient, clientSideMount=True):
 		threading.Thread.__init__(self)
@@ -112,10 +116,7 @@ class DeployThread(threading.Thread):
 		try:
 			hostName = host.split('.')[0]
 			hostId = self._getHostId(host.replace('_', '-'))
-
-			if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
-				logger.notice(u"Skipping host '%s'" % hostId)
-				return
+			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
 
@@ -208,6 +209,9 @@ class DeployThread(threading.Thread):
 				])
 
 			self._finaliseInstallation(hostId, hn)
+		except SkipClientException:
+			logger.notice(u"Skipping host '%s'" % hostId)
+			return
 		except Exception, e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
 			if hostObj and hostCreated:
@@ -222,6 +226,10 @@ class DeployThread(threading.Thread):
 			return forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
 			return forceHostId(host)
+
+	def _checkIfClientShouldBeSkipped(hostId):
+		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
+			raise SkipClientException("Client {0} exists.".format(hostId))
 
 	@staticmethod
 	def _getIpAddress(hostId, hostName):
@@ -347,10 +355,7 @@ class DeployThread(threading.Thread):
 		try:
 			hostId = self._getHostId(host)
 			hostName = hostId.split('.')[0]
-
-			if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
-				logger.notice(u"Skipping host '%s'" % hostId)
-				return
+			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
 
@@ -477,6 +482,9 @@ class DeployThread(threading.Thread):
 				])
 
 			self._finaliseInstallation(hostId, hostName)
+		except SkipClientException:
+			logger.notice(u"Skipping host '%s'" % hostId)
+			return
 		except Exception, e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
 			if hostObj and hostCreated:
