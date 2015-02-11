@@ -123,7 +123,7 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
 			mac = self._getMacAddress(ipAddress)
 			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
+				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
 
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
@@ -365,7 +365,7 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
 			mac = self._getMacAddress(ipAddress)
 			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
+				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
 
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
