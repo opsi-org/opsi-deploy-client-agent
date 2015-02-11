@@ -583,7 +583,7 @@ def main(argv):
 	)
 	runningThreads = []
 	while hosts:
-		while (len(runningThreads) > maxThreads):
+		while len(runningThreads) > maxThreads:
 			time.sleep(1)
 			for t in runningThreads:
 				if t.isAlive():
@@ -611,7 +611,7 @@ def main(argv):
 			t.join()
 
 
-if (__name__ == "__main__"):
+if __name__ == "__main__":
 	logger.setConsoleLevel(LOG_WARNING)
 	logger.setLogFormat('[%L] %M')
 	logger.setConsoleColor(True)
