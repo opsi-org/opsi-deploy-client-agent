@@ -32,7 +32,6 @@ installed via opsi.
 """
 
 import getpass
-import inspect
 import os
 import re
 import shutil
