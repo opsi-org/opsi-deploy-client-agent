@@ -352,8 +352,6 @@ class DeployThread(threading.Thread):
 		mountDir = u''
 		instDir = u''
 		hostCreated = False
-		mountDirCreated = False
-		instDirCreated = False
 		mounted = False
 		try:
 			hostId = self._getHostId(host)
@@ -379,7 +377,6 @@ class DeployThread(threading.Thread):
 			instDir = os.path.join(mountDir, instDirName)
 
 			os.makedirs(mountDir)
-			mountDirCreated = True
 
 			logger.notice(u"Mounting c$ share")
 			try:
@@ -404,7 +401,6 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Copying installation files")
 
 			os.makedirs(instDir)
-			instDirCreated = True
 
 			copy(u'files', instDir)
 			copy(u'utils', instDir)
