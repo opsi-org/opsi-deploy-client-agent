@@ -396,7 +396,7 @@ class DeployThread(threading.Thread):
 			mounted = True
 
 			logger.notice(u"Copying installation files")
-			instDirName = u'opsi_' + randomString(10)
+			instDirName = u'opsi_{random}'.format(random=randomString(10))
 			instDir = os.path.join(mountDir, instDirName)
 			os.makedirs(instDir)
 
