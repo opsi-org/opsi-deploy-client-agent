@@ -135,7 +135,7 @@ class DeployThread(threading.Thread):
 					winexe(cmd, networkAddress, self.username, self.password)
 					break
 				except Exception as e:
-					if (trynum == 2):
+					if trynum == 2:
 						raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, e))
 					logger.info(u"Winexe failure '%s', retrying" % e)
 					time.sleep(2)
@@ -166,7 +166,7 @@ class DeployThread(threading.Thread):
 						winexe(cmd, networkAddress, self.username, self.password)
 						break
 					except Exception as e:
-						if (trynum == 2):
+						if trynum == 2:
 							raise Exception(u"Failed to install opsi-client-agent: %s" % e)
 						logger.info(u"Winexe failure '%s', retrying" % e)
 						time.sleep(2)
@@ -411,7 +411,7 @@ class DeployThread(threading.Thread):
 					winexe(cmd, networkAddress, self.username, self.password)
 					break
 				except Exception as e:
-					if (trynum == 2):
+					if trynum == 2:
 						raise Exception(u"Failed to install opsi-client-agent: %s" % e)
 					logger.info(u"Winexe failure '%s', retrying" % e)
 					time.sleep(2)
