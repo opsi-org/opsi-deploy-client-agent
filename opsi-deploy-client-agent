@@ -200,11 +200,7 @@ class DeployThread(threading.Thread):
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
 			if hostObj and not self.keepClientOnFailure:
-				try:
-					logger.notice('Deleting client {0} from backend.'.format(hostObj))
-					self.backend.host_deleteObjects([hostObj])
-				except Exception as anotherError:
-					logger.error(anotherError)
+				self._removeHostFromBackend(hostObj)
 
 	def _getHostId(self, host):
 		if self.deploymentMethod == 'ip':
@@ -377,6 +373,13 @@ class DeployThread(threading.Thread):
 			except Exception as error:
 				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=networkAddress, error=error))
 
+	def _removeHostFromBackend(self, host):
+		try:
+			logger.notice('Deleting client {0} from backend.'.format(hostObj))
+			self.backend.host_deleteObjects([hostObj])
+		except Exception as anotherError:
+			logger.error(anotherError)
+
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
 		host = forceUnicodeLower(self.host)
@@ -459,11 +462,7 @@ class DeployThread(threading.Thread):
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
 			if hostObj and not self.keepClientOnFailure:
-				try:
-					logger.notice('Deleting client {0} from backend.'.format(hostObj))
-					self.backend.host_deleteObjects([hostObj])
-				except Exception as anotherError:
-					logger.error(anotherError)
+				self._removeHostFromBackend(hostObj)
 		finally:
 			if instDir or mountDir:
 				logger.notice(u"Cleaning up")
