@@ -585,13 +585,14 @@ def main(argv):
 	while hosts:
 		while len(runningThreads) > maxThreads:
 			time.sleep(1)
-			for t in runningThreads:
-				if t.isAlive():
+			for thread in runningThreads:
+				if thread.isAlive():
 					continue
-				runningThreads.remove(t)
+				runningThreads.remove(thread)
 				break
+
 		host = hosts.pop()
-		t = DeployThread(host, backend,
+		thread = DeployThread(host, backend,
 			args.username,
 			password,
 			args.shutdown,
@@ -602,13 +603,13 @@ def main(argv):
 			args.skipExistingClient,
 			args.clientSideMount
 		)
-		t.start()
-		runningThreads.append(t)
+		thread.start()
+		runningThreads.append(thread)
 		time.sleep(0.5)
 
-	for t in runningThreads:
-		if t.isAlive():
-			t.join()
+	for thread in runningThreads:
+		if thread.isAlive():
+			thread.join()
 
 
 if __name__ == "__main__":
