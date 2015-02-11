@@ -136,10 +136,10 @@ class DeployThread(threading.Thread):
 				try:
 					winexe(cmd, networkAddress, self.username, self.password)
 					break
-				except Exception as e:
+				except Exception as error:
 					if trynum == 2:
-						raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, e))
-					logger.info(u"Winexe failure '%s', retrying" % e)
+						raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
+					logger.info(u"Winexe failure '%s', retrying" % error)
 					time.sleep(2)
 
 			logger.notice(u"Patching config.ini")
@@ -167,10 +167,10 @@ class DeployThread(threading.Thread):
 					try:
 						winexe(cmd, networkAddress, self.username, self.password)
 						break
-					except Exception as e:
+					except Exception as error:
 						if trynum == 2:
-							raise Exception(u"Failed to install opsi-client-agent: %s" % e)
-						logger.info(u"Winexe failure '%s', retrying" % e)
+							raise Exception(u"Failed to install opsi-client-agent: %s" % error)
+						logger.info(u"Winexe failure '%s', retrying" % error)
 						time.sleep(2)
 			finally:
 				os.remove('/tmp/%s' % configIniName)
@@ -178,8 +178,8 @@ class DeployThread(threading.Thread):
 				try:
 					cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst"'
 					winexe(cmd, networkAddress, self.username, self.password)
-				except Exception as e:
-					logger.error(e)
+				except Exception as error:
+					logger.error(error)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self._setOpsiClientAgentToInstalled(hostId)
@@ -187,14 +187,14 @@ class DeployThread(threading.Thread):
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
-		except Exception as e:
-			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
+		except Exception as error:
+			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
 			if hostObj:
 				try:
 					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
-				except Exception as e2:
-					logger.error(e2)
+				except Exception as anotherError:
+					logger.error(anotherError)
 
 	@staticmethod
 	def _getHostId(host):
@@ -214,8 +214,8 @@ class DeployThread(threading.Thread):
 		logger.info(u"Getting host '%s' by name" % hostId)
 		try:
 			ipAddress = socket.gethostbyname(hostId)
-		except Exception as e:
-			logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, e))
+		except Exception as error:
+			logger.warning(u"Failed to get ip address for host '%s' by syscall: %s" % (hostId, error))
 
 		if ipAddress:
 			logger.notice(u"Got ip address '%s' from syscall" % ipAddress)
@@ -241,8 +241,8 @@ class DeployThread(threading.Thread):
 				match = re.search("\s+(\d+)%\s+packet\s+loss", line)
 				if match and (forceInt(match.group(1)) < 100):
 					alive = True
-		except Exception as e:
-			logger.error(e)
+		except Exception as error:
+			logger.error(error)
 
 		if alive:
 			logger.notice(u"Host %s is up" % ipAddress)
@@ -379,11 +379,11 @@ class DeployThread(threading.Thread):
 			try:
 				try:
 					execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), networkAddress, mountDir), timeout=15)
-				except Exception as e:
-					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % e)
+				except Exception as error:
+					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % error)
 					execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), networkAddress, mountDir), timeout=15)
-			except Exception as e:
-				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % e)
+			except Exception as error:
+				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % error)
 
 			logger.notice(u"Copying installation files")
 			instDirName = u'opsi_{random}'.format(random=randomString(10))
@@ -412,10 +412,10 @@ class DeployThread(threading.Thread):
 				try:
 					winexe(cmd, networkAddress, self.username, self.password)
 					break
-				except Exception as e:
+				except Exception as error:
 					if trynum == 2:
-						raise Exception(u"Failed to install opsi-client-agent: %s" % e)
-					logger.info(u"Winexe failure '%s', retrying" % e)
+						raise Exception(u"Failed to install opsi-client-agent: %s" % error)
+					logger.info(u"Winexe failure '%s', retrying" % error)
 					time.sleep(2)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
@@ -424,14 +424,14 @@ class DeployThread(threading.Thread):
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
-		except Exception as e:
-			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
+		except Exception as error:
+			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
 			if hostObj:
 				try:
 					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
-				except Exception as e2:
-					logger.error(e2)
+				except Exception as anotherError:
+					logger.error(anotherError)
 		finally:
 			if instDir or mountDir:
 				logger.notice(u"Cleaning up")
@@ -509,8 +509,8 @@ def main(argv):
 		if not os.path.isfile(args.hostFile):
 			raise Exception(u"File '%s' not found!" % args.hostFile)
 
-		with open(args.hostFile) as f:
-			for line in f:
+		with open(args.hostFile) as inputFile:
+			for line in inputFile:
 				line = line.strip()
 				if not line or line.startswith('#') or line.startswith(';'):
 					continue
