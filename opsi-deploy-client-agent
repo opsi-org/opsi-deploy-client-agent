@@ -57,9 +57,6 @@ __version__ = '4.0.6.1'
 
 
 logger = Logger()
-logger.setConsoleLevel(LOG_WARNING)
-logger.setLogFormat('[%L] %M')
-logger.setConsoleColor(True)
 
 
 def winexe(cmd, host, username, password):
@@ -589,6 +586,10 @@ def main(argv):
 
 
 if (__name__ == "__main__"):
+	logger.setConsoleLevel(LOG_WARNING)
+	logger.setLogFormat('[%L] %M')
+	logger.setConsoleColor(True)
+
 	try:
 		os.chdir(os.path.dirname(os.path.abspath(__file__)))
 		main(sys.argv)
