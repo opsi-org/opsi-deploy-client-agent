@@ -437,14 +437,6 @@ class DeployThread(threading.Thread):
 					logger.info(u"Winexe failure '%s', retrying" % e)
 					time.sleep(2)
 
-			logger.notice(u"Cleaning up")
-			shutil.rmtree(instDir)
-			instDir = None
-			umount(mountDir)
-			mounted = False
-			os.rmdir(mountDir)
-			mountDir = None
-
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation(hostId, hostName)
@@ -458,21 +450,26 @@ class DeployThread(threading.Thread):
 					self.backend.host_deleteObjects([hostObj])
 				except Exception, e2:
 					logger.error(e2)
-			if instDir and instDirCreated:
+		finally:
+			if instDir or mountDir:
+				logger.notice(u"Cleaning up")
+
+			if instDir:
 				try:
 					shutil.rmtree(instDir)
-				except Exception, e2:
-					logger.error(e2)
-			if mountDir and mounted:
+				except OSError as err:
+					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
+
+			if mountDir:
 				try:
 					umount(mountDir)
-				except Exception, e2:
-					logger.error(e2)
-			if mountDir and mountDirCreated:
+				except Exception as err:
+					logger.debug('Unmounting {0} failed: {1}'.format(mountDir, err))
+
 				try:
 					os.rmdir(mountDir)
-				except Exception, e2:
-					logger.error(e2)
+				except Exception as err:
+					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
 
 
 def main(argv):
