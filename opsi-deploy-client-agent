@@ -300,32 +300,36 @@ class DeployThread(threading.Thread):
 
 	def _finaliseInstallation(self, networkAddress):
 		if self.reboot or self.shutdown:
-			cmd = u''
 			if self.reboot:
 				logger.notice(u"Rebooting machine '%s'" % networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
 			elif self.shutdown:
 				logger.notice(u"Shutting down machine '%s'" % networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
+
 			try:
 				pf = None
 				for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
-					lines = []
 					try:
 						lines = winexe(u'cmd.exe /C "echo %s"' % const, networkAddress, self.username, self.password)
 					except Exception as e:
 						logger.warning(e)
 						continue
+
 					for line in lines:
 						line = line.strip()
-						if (line.find('unavailable') != -1):
+						if 'unavailable' in line:
 							continue
 						pf = line
-					if pf and (pf != const):
+
+					if pf and pf != const:
 						break
+
 					pf = None
+
 				if not pf:
 					raise Exception(u"Failed to get program files path")
+
 				logger.info(u"Program files path is '%s'" % pf)
 				winexe(cmd.replace(u'%ProgramFiles%', pf), networkAddress, self.username, self.password)
 			except Exception as e:
