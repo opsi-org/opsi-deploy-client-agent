@@ -373,9 +373,6 @@ class DeployThread(threading.Thread):
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
-			instDirName = u'opsi_' + randomString(10)
-			instDir = os.path.join(mountDir, instDirName)
-
 			os.makedirs(mountDir)
 
 			logger.notice(u"Mounting c$ share")
@@ -399,7 +396,8 @@ class DeployThread(threading.Thread):
 			mounted = True
 
 			logger.notice(u"Copying installation files")
-
+			instDirName = u'opsi_' + randomString(10)
+			instDir = os.path.join(mountDir, instDirName)
 			os.makedirs(instDir)
 
 			copy(u'files', instDir)
