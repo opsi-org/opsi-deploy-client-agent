@@ -308,7 +308,7 @@ class DeployThread(threading.Thread):
 		elif self.deploymentMethod == 'fqdn':
 			return hostId
 		else:
-			return ip
+			return ipAddress
 
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
