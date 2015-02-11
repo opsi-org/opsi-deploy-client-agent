@@ -85,7 +85,11 @@ class SkipClientException(Exception):
 
 
 class DeployThread(threading.Thread):
-	def __init__(self, host, backend, username, password, shutdown, reboot, startService, deploymentMethod="hostname", stopOnPingFailure=True, skipExistingClient=False, clientSideMount=True):
+	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
+				deploymentMethod="hostname", stopOnPingFailure=True,
+				skipExistingClient=False, clientSideMount=True,
+				keepClientOnFailure=False):
+
 		threading.Thread.__init__(self)
 		self.host = host
 		self.backend = backend
@@ -102,6 +106,8 @@ class DeployThread(threading.Thread):
 		if deploymentMethod not in ("hostname", "ip", "fqdn"):
 			raise ValueError("Invalid deployment method: {0}".format(deploymentMethod))
 		self.deploymentMethod = deploymentMethod
+
+		self.keepClientOnFailure = keepClientOnFailure
 
 	def run(self):
 		if self.clientSideMount:
@@ -193,7 +199,7 @@ class DeployThread(threading.Thread):
 			return
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
-			if hostObj:
+			if hostObj and not self.keepClientOnFailure:
 				try:
 					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
@@ -452,7 +458,7 @@ class DeployThread(threading.Thread):
 			return
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
-			if hostObj:
+			if hostObj and not self.keepClientOnFailure:
 				try:
 					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
@@ -530,6 +536,11 @@ def main(argv):
 	parser.add_argument('--server-side-mount', dest="clientSideMount",
 						default=True, action="store_false",
 						help=u"Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
+	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
+						default=False, action="store_true",
+						help=(u"If the client was created in opsi and "
+								u"anything fails after that the client is "
+								u"not removed."))
 	parser.add_argument('host', nargs='*',
 						help='The hosts to deploy the opsi-client-agent to.')
 
@@ -607,7 +618,8 @@ def main(argv):
 			deploymentMethod,
 			args.stopOnPingFailure,
 			args.skipExistingClient,
-			args.clientSideMount
+			args.clientSideMount,
+			args.keepClientOnFailure
 		)
 		thread.start()
 		runningThreads.append(thread)
