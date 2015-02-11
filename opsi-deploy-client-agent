@@ -108,7 +108,6 @@ class DeployThread(threading.Thread):
 		host = forceUnicodeLower(self.host)
 		hostId = u''
 		hostObj = None
-		hostCreated = False
 		try:
 			hostName = host.split('.')[0]
 			hostId = self._getHostId(host.replace('_', '-'))
@@ -125,7 +124,6 @@ class DeployThread(threading.Thread):
 				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
 
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
-			hostCreated = True
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			hn = hostId
@@ -191,8 +189,9 @@ class DeployThread(threading.Thread):
 			return
 		except Exception as e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
-			if hostObj and hostCreated:
+			if hostObj:
 				try:
+					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
 				except Exception as e2:
 					logger.error(e2)
@@ -348,8 +347,6 @@ class DeployThread(threading.Thread):
 		hostObj = None
 		mountDir = u''
 		instDir = u''
-		hostCreated = False
-		mounted = False
 		try:
 			hostId = self._getHostId(host)
 			hostName = hostId.split('.')[0]
@@ -366,7 +363,6 @@ class DeployThread(threading.Thread):
 				logger.warning(u"Failed to get hardware ethernet address for host '%s'" % hostName)
 
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
-			hostCreated = True
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
@@ -389,8 +385,6 @@ class DeployThread(threading.Thread):
 							% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout=15)
 			except Exception as e:
 				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % e)
-
-			mounted = True
 
 			logger.notice(u"Copying installation files")
 			instDirName = u'opsi_{random}'.format(random=randomString(10))
@@ -436,8 +430,9 @@ class DeployThread(threading.Thread):
 			return
 		except Exception as e:
 			logger.error(u"Deployment to '%s' failed: %s" % (hostId, e))
-			if hostObj and hostCreated:
+			if hostObj:
 				try:
+					logger.notice('Deleting client {0} from backend.'.format(hostObj))
 					self.backend.host_deleteObjects([hostObj])
 				except Exception as e2:
 					logger.error(e2)
