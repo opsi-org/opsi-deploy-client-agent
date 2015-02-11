@@ -459,7 +459,7 @@ class DeployThread(threading.Thread):
 
 				try:
 					os.rmdir(mountDir)
-				except Exception as err:
+				except OSError as err:
 					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
 
 
