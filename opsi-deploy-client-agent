@@ -31,6 +31,8 @@ installed via opsi.
 :license: GNU Affero General Public License version 3
 """
 
+from __future__ import print_function
+
 import getpass
 import os
 import re
@@ -583,10 +585,10 @@ if (__name__ == "__main__"):
 	try:
 		os.chdir(os.path.dirname(os.path.abspath(__file__)))
 		main(sys.argv[1:])
-	except Exception as e:
+	except Exception as error:
 		logger.setConsoleLevel(LOG_ERROR)
-		logger.logException(e)
-		print >> sys.stderr, u"ERROR: %s" % forceUnicode(e)
+		logger.logException(error)
+		print(u"ERROR: %s" % forceUnicode(error), file=sys.stderr)
 		sys.exit(1)
 
 	sys.exit(0)
