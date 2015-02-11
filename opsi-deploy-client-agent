@@ -529,8 +529,11 @@ def main(argv):
 	if not hosts:
 		raise Exception("No hosts given.")
 
+	logger.debug('Deploying to the following hosts: {0}'.format(hosts))
+
 	password = args.password
 	if not password:
+		print("Password is required for deployment.")
 		password = forceUnicode(getpass.getpass())
 		if not password:
 			raise Exception("No password given.")
