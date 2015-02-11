@@ -375,10 +375,10 @@ class DeployThread(threading.Thread):
 
 	def _removeHostFromBackend(self, host):
 		try:
-			logger.notice('Deleting client {0} from backend.'.format(hostObj))
-			self.backend.host_deleteObjects([hostObj])
-		except Exception as anotherError:
-			logger.error(anotherError)
+			logger.notice('Deleting client {0} from backend.'.format(host))
+			self.backend.host_deleteObjects([host])
+		except Exception as error:
+			logger.error(error)
 
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
