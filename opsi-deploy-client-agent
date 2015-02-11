@@ -203,7 +203,7 @@ class DeployThread(threading.Thread):
 	def _getHostId(self, host):
 		if self.deploymentMethod == 'ip':
 			try:
-				(hostname, aliases, ips) = socket.gethostbyaddr(host)
+				(hostname, _, _) = socket.gethostbyaddr(host)
 				host = hostname
 			except socket.herror as error:
 				logger.debug("Lookup failed: {0}".format(error))
