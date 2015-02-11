@@ -455,7 +455,7 @@ class DeployThread(threading.Thread):
 				try:
 					umount(mountDir)
 				except Exception as err:
-					logger.debug('Unmounting {0} failed: {1}'.format(mountDir, err))
+					logger.warning('Unmounting {0} failed: {1}'.format(mountDir, err))
 
 				try:
 					os.rmdir(mountDir)
