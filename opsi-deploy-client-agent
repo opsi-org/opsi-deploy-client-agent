@@ -212,6 +212,12 @@ class DeployThread(threading.Thread):
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
+			try:
+				host = socket.getfqdn(socket.gethostbyname(host))
+			except socket.gaierror as error:
+				logger.debug("Lookup of {0} failed.".format(host))
+
+		if host.count(u'.') < 2:
 			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
 			hostId = forceHostId(host)
