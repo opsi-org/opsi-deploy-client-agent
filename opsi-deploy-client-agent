@@ -312,8 +312,8 @@ class DeployThread(threading.Thread):
 				for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
 					try:
 						lines = winexe(u'cmd.exe /C "echo %s"' % const, networkAddress, self.username, self.password)
-					except Exception as e:
-						logger.warning(e)
+					except Exception as error:
+						logger.warning(error)
 						continue
 
 					for line in lines:
@@ -332,11 +332,11 @@ class DeployThread(threading.Thread):
 
 				logger.info(u"Program files path is '%s'" % pf)
 				winexe(cmd.replace(u'%ProgramFiles%', pf), networkAddress, self.username, self.password)
-			except Exception as e:
+			except Exception as error:
 				if self.reboot:
-					logger.error(u"Failed to reboot computer: %s" % e)
+					logger.error(u"Failed to reboot computer: %s" % error)
 				else:
-					logger.error(u"Failed to shutdown computer: %s" % e)
+					logger.error(u"Failed to shutdown computer: %s" % error)
 		elif self.startService:
 			try:
 				winexe(u'net start opsiclientd', networkAddress, self.username, self.password)
