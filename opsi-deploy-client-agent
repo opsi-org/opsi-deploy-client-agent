@@ -46,7 +46,7 @@ from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR
 from OPSI.Object import OpsiClient, ProductOnClient
 from OPSI.System import copy, execute, getFQDN, umount, which
-from OPSI.Types import forceHostId, forceInt, forceUnicode, forceUnicodeLower
+from OPSI.Types import forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower
 from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
 
@@ -85,7 +85,7 @@ class SkipClientException(Exception):
 
 
 class DeployThread(threading.Thread):
-	def __init__(self, host, backend, username, password, shutdown, reboot, startService, useNetbios, stopOnPingFailure, skipExistingClient, clientSideMount=True):
+	def __init__(self, host, backend, username, password, shutdown, reboot, startService, deploymentMethod="hostname", stopOnPingFailure=True, skipExistingClient=False, clientSideMount=True):
 		threading.Thread.__init__(self)
 		self.host = host
 		self.backend = backend
@@ -99,6 +99,11 @@ class DeployThread(threading.Thread):
 		self.skipExistingClient = skipExistingClient
 		self.clientSideMount = clientSideMount
 
+		deploymentMethod = forceUnicodeLower(deploymentMethod)
+		if deploymentMethod not in ("hostname", "ip", "fqdn"):
+			raise ValueError("Invalid deployment method: {0}".format(deploymentMethod))
+		self.deploymentMethod = deploymentMethod
+
 	def run(self):
 		if self.clientSideMount:
 			self._installWithClientSideMount()
@@ -111,8 +116,8 @@ class DeployThread(threading.Thread):
 		hostId = u''
 		hostObj = None
 		try:
+			hostId = self._getHostId(host)
 			hostName = host.split('.')[0]
-			hostId = self._getHostId(host.replace('_', '-'))
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
@@ -128,7 +133,7 @@ class DeployThread(threading.Thread):
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
-			networkAddress = self._getNetworkAddress(hostId, hostName)
+			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
 
 			logger.notice(u"Testing winexe")
 			cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
@@ -196,19 +201,33 @@ class DeployThread(threading.Thread):
 				except Exception as anotherError:
 					logger.error(anotherError)
 
-	@staticmethod
-	def _getHostId(host):
+	def _getHostId(self, host):
+		if self.deploymentMethod == 'ip':
+			try:
+				(hostname, aliases, ips) = socket.gethostbyaddr(host)
+				host = hostname
+			except socket.herror as error:
+				logger.debug("Lookup failed: {0}".format(error))
+				raise Exception("Can't find name for IP {0}: {1}".format(host, error))
+
+		host = host.replace('_', '-')
+
 		if host.count(u'.') < 2:
-			return forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
+			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
-			return forceHostId(host)
+			hostId = forceHostId(host)
+
+		logger.info("Got hostId {0}".format(hostId))
+		return hostId
 
 	def _checkIfClientShouldBeSkipped(self, hostId):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 			raise SkipClientException("Client {0} exists.".format(hostId))
 
-	@staticmethod
-	def _getIpAddress(hostId, hostName):
+	def _getIpAddress(self, hostId, hostName):
+		if self.deploymentMethod == 'ip':
+			return forceIPAddress(self.host)
+
 		logger.notice(u"Querying for ip address of host '%s'" % hostId)
 		ipAddress = u''
 		logger.info(u"Getting host '%s' by name" % hostId)
@@ -284,11 +303,13 @@ class DeployThread(threading.Thread):
 			)
 			self.backend.host_createObjects([hostObj])
 
-	def _getNetworkAddress(self, hostId, hostName):
-		if self.useNetbios:
+	def _getNetworkAddress(self, hostId, hostName, ipAddress):
+		if self.deploymentMethod == 'hostname':
 			return hostName
-		else:
+		elif self.deploymentMethod == 'fqdn':
 			return hostId
+		else:
+			return ip
 
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
@@ -354,7 +375,7 @@ class DeployThread(threading.Thread):
 		instDir = u''
 		try:
 			hostId = self._getHostId(host)
-			hostName = hostId.split('.')[0]
+			hostName = host.split('.')[0]
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
@@ -370,7 +391,7 @@ class DeployThread(threading.Thread):
 			self._createHostIfNotExisting(hostId, mac, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
-			networkAddress = self._getNetworkAddress(hostId, hostName)
+			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
 			os.makedirs(mountDir)
@@ -473,9 +494,16 @@ def main(argv):
 						)
 	parser.add_argument('-p', dest="password", default=u"",
 						help=u"password for authentication")
-	parser.add_argument('-c', dest="useNetbios", default=True,
+	group = parser.add_mutually_exclusive_group()
+	group.add_argument('-c', '--use-fqdn', dest="useNetbios",
 						action="store_false",
-						help=u"use fqdn instead of hostname for smb/cifs connection")
+						help=u"Use FQDN to connect to client.")
+	group.add_argument('--use-hostname', dest="useNetbios", default=False,
+						action="store_true",
+						help=u"Use hostname to connect to client. (Default)")
+	group.add_argument('--use-ip-address', dest="useIPAddress",
+						action='store_true',
+						help="Use IP address to connect to client.")
 	parser.add_argument('-x', dest="stopOnPingFailure", default=True,
 						action="store_false",
 						help=u"try installation even if ping fails")
@@ -539,6 +567,13 @@ def main(argv):
 		if os.getuid() != 0:
 			raise Exception("You have to be root to use server-side-mouting.")
 
+	if args.useIPAddress:
+		deploymentMethod = "ip"
+	elif args.useNetbios:
+		deploymentMethod = "hostname"
+	else:
+		deploymentMethod = "fqdn"
+
 	# Create BackendManager
 	backend = BackendManager(
 		dispatchConfigFile=u'/etc/opsi/backendManager/dispatch.conf',
@@ -563,7 +598,7 @@ def main(argv):
 			args.shutdown,
 			args.reboot,
 			args.startService,
-			args.useNetbios,
+			deploymentMethod,
 			args.stopOnPingFailure,
 			args.skipExistingClient,
 			args.clientSideMount
