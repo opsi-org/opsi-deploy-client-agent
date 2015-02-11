@@ -94,7 +94,6 @@ class DeployThread(threading.Thread):
 		self.shutdown = shutdown
 		self.reboot = reboot
 		self.startService = startService
-		self.useNetbios = useNetbios
 		self.stopOnPingFailure = stopOnPingFailure
 		self.skipExistingClient = skipExistingClient
 		self.clientSideMount = clientSideMount
