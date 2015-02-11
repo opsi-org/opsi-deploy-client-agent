@@ -272,8 +272,8 @@ class DeployThread(threading.Thread):
 	@staticmethod
 	def _getMacAddress(ipAddress):
 		mac = u''
-		with open("/proc/net/arp") as f:
-			for line in f:
+		with open("/proc/net/arp") as arptable:
+			for line in arptable:
 				line = line.strip()
 				if not line:
 					continue
