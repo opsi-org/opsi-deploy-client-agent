@@ -497,14 +497,14 @@ def main(argv):
 	parser.add_argument('--server-side-mount', dest="clientSideMount",
 						default=True, action="store_false",
 						help=u"Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
-	parser.add_argument('hosts', nargs='*',
+	parser.add_argument('host', nargs='*',
 						help='The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args(argv)
 
 	logger.setConsoleLevel(args.logLevel)
 
-	hosts = args.hosts
+	hosts = args.host
 	if args.hostFile:
 		if not os.path.isfile(args.hostFile):
 			raise Exception(u"File '%s' not found!" % args.hostFile)
