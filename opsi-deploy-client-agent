@@ -386,35 +386,17 @@ class DeployThread(threading.Thread):
 			try:
 				try:
 					if self.useNetbios:
-						if "timeout" in inspect.getargspec(execute)[0]:
-							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
-						else:
-							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
+						execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout=15)
 					else:
-						if "timeout" in inspect.getargspec(execute)[0]:
-							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
-						else:
-							execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
+						execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout=15)
 				except Exception, e:
 					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % e)
 					if self.useNetbios:
-						if "timeout" in inspect.getargspec(execute)[0]:
-							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout = 15)
-						else:
-							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir))
+						execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostName, mountDir), timeout=15)
 					else:
-						if "timeout" in inspect.getargspec(execute)[0]:
-							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout = 15)
-						else:
-							execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
-								% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir))
+						execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" \
+							% (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), hostId, mountDir), timeout=15)
 			except Exception, e:
 				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % e)
 
