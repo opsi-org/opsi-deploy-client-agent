@@ -506,19 +506,17 @@ def main(argv):
 	parser.add_argument('--server-side-mount', dest="clientSideMount",
 						default=True, action="store_false",
 						help=u"Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
-	parser.add_argument('host', dest="hosts", action="append",
-						nargs=argparse.REMAINDER,
+	parser.add_argument('hosts', nargs='*',
 						help='The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args(argv)
 
 	logger.setConsoleLevel(args.logLevel)
 
-	# TODO: check how we can handle hosts
-	hosts = list(args.hosts)
+	hosts = args.hosts
 	if args.hostFile:
 		if not os.path.isfile(args.hostFile):
-				raise Exception(u"File '%s' not found!" % args.hostFile)
+			raise Exception(u"File '%s' not found!" % args.hostFile)
 
 		with open(args.hostFile) as f:
 			for line in f:
@@ -592,7 +590,7 @@ if (__name__ == "__main__"):
 
 	try:
 		os.chdir(os.path.dirname(os.path.abspath(__file__)))
-		main(sys.argv)
+		main(sys.argv[1:])
 	except Exception as e:
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(e)
