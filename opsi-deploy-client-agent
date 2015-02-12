@@ -207,7 +207,7 @@ class DeployThread(threading.Thread):
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
 
 				try:
-					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', networkAddress, self.username, self.password)
+					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
 					for line in output:
 						if line.strip():
 							host = line.strip()
