@@ -134,18 +134,7 @@ class DeployThread(threading.Thread):
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
-
-			logger.notice(u"Testing winexe")
-			cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
-			for trynum in (1, 2):
-				try:
-					winexe(cmd, networkAddress, self.username, self.password)
-					break
-				except Exception as error:
-					if trynum == 2:
-						raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
-					logger.info(u"Winexe failure '%s', retrying" % error)
-					time.sleep(2)
+			self._testWinexeConnection(networkAddress)
 
 			logger.notice(u"Patching config.ini")
 			configIniName = u'%s_config.ini' % randomString(10)
@@ -327,6 +316,19 @@ class DeployThread(threading.Thread):
 		else:
 			return ipAddress
 
+	def _testWinexeConnection(self, networkAddress):
+		logger.notice(u"Testing winexe")
+		cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
+		for trynum in (1, 2):
+			try:
+				winexe(cmd, networkAddress, self.username, self.password)
+				break
+			except Exception as error:
+				if trynum == 2:
+					raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
+				logger.info(u"Winexe failure '%s', retrying" % error)
+				time.sleep(2)
+
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
 			productType=u'LocalbootProduct',
@@ -410,6 +412,7 @@ class DeployThread(threading.Thread):
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
+			self._testWinexeConnection(networkAddress)
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
 			os.makedirs(mountDir)
