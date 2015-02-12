@@ -130,12 +130,7 @@ class DeployThread(threading.Thread):
 			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
 
-			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
-			mac = self._getMacAddress(ipAddress)
-			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
-
-			self._createHostIfNotExisting(hostId, mac, ipAddress)
+			self._createHostIfNotExisting(hostId, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
@@ -307,10 +302,14 @@ class DeployThread(threading.Thread):
 
 		return mac
 
-	def _createHostIfNotExisting(self, hostId, mac, ipAddress):
+	def _createHostIfNotExisting(self, hostId, ipAddress):
 		if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
-			logger.notice(u"Creating client '%s'" % hostId)
+			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
+			mac = self._getMacAddress(ipAddress)
+			if not mac:
+				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
 
+			logger.notice(u"Creating client '%s'" % hostId)
 			hostObj = OpsiClient(
 				id=hostId,
 				hardwareAddress=mac,
@@ -407,12 +406,7 @@ class DeployThread(threading.Thread):
 			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
 
-			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
-			mac = self._getMacAddress(ipAddress)
-			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
-
-			self._createHostIfNotExisting(hostId, mac, ipAddress)
+			self._createHostIfNotExisting(hostId, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
 			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
