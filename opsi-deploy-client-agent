@@ -204,12 +204,22 @@ class DeployThread(threading.Thread):
 
 	def _getHostId(self, host):
 		if self.deploymentMethod == 'ip':
+			ip = forceIPAddress(host)
 			try:
-				(hostname, _, _) = socket.gethostbyaddr(host)
+				(hostname, _, _) = socket.gethostbyaddr(ip)
 				host = hostname
 			except socket.herror as error:
-				logger.debug("Lookup failed: {0}".format(error))
-				raise Exception("Can't find name for IP {0}: {1}".format(host, error))
+				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
+
+				try:
+					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', networkAddress, self.username, self.password)
+					for line in output:
+						if line.strip():
+							host = line.strip()
+							break
+				except Exception as error:
+					logger.debug("Name lookup via winexe failed: {0}".format(error))
+					raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
 
 		host = host.replace('_', '-')
 
