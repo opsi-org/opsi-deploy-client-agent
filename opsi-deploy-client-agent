@@ -282,6 +282,23 @@ class DeployThread(threading.Thread):
 		else:
 			logger.warning(u"No ping response received from %s" % ipAddress)
 
+	def _createHostIfNotExisting(self, hostId, ipAddress):
+		if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
+			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
+			mac = self._getMacAddress(ipAddress)
+			if not mac:
+				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
+
+			logger.notice(u"Creating client '%s'" % hostId)
+			hostObj = OpsiClient(
+				id=hostId,
+				hardwareAddress=mac,
+				ipAddress=ipAddress,
+				description=u"",
+				notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+			)
+			self.backend.host_createObjects([hostObj])
+
 	@staticmethod
 	def _getMacAddress(ipAddress):
 		mac = u''
@@ -301,23 +318,6 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Found hardware ethernet address '%s'" % mac)
 
 		return mac
-
-	def _createHostIfNotExisting(self, hostId, ipAddress):
-		if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
-			logger.notice(u"Getting hardware ethernet address of host '%s'" % hostId)
-			mac = self._getMacAddress(ipAddress)
-			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
-
-			logger.notice(u"Creating client '%s'" % hostId)
-			hostObj = OpsiClient(
-				id=hostId,
-				hardwareAddress=mac,
-				ipAddress=ipAddress,
-				description=u"",
-				notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
-			)
-			self.backend.host_createObjects([hostObj])
 
 	def _getNetworkAddress(self, hostId, hostName, ipAddress):
 		if self.deploymentMethod == 'hostname':
