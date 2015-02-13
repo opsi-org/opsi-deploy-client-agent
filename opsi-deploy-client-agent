@@ -182,7 +182,7 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
 		except Exception as error:
-			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
+			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
 			if hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 
@@ -467,7 +467,7 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
 		except Exception as error:
-			logger.error(u"Deployment to '%s' failed: %s" % (hostId, error))
+			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
 			if hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 		finally:
