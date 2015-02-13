@@ -324,6 +324,11 @@ class DeployThread(threading.Thread):
 				winexe(cmd, networkAddress, self.username, self.password)
 				break
 			except Exception as error:
+				if 'NT_STATUS_LOGON_FAILURE' in forceUnicode(error):
+					logger.warning("Can't connect to {0}: check your credentials".format(networkAddress))
+				elif 'NT_STATUS_IO_TIMEOUT' in forceUnicode(error):
+					logger.warning("Can't connect to {0}: firewall on client seems active".format(networkAddress))
+
 				if trynum == 2:
 					raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
 				logger.info(u"Winexe failure '%s', retrying" % error)
