@@ -135,17 +135,12 @@ class DeployThread(threading.Thread):
 				host = hostname
 			except socket.herror as error:
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
+				raise error
 
-				try:
-					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
-					for line in output:
-						if line.strip():
-							host = line.strip()
-							break
-				except Exception as error:
-					logger.debug("Name lookup via winexe failed: {0}".format(error))
-					raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
+		return self._normaliseHostId(host)
 
+	@staticmethod
+	def _normaliseHostId(host):
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
@@ -361,6 +356,22 @@ class WindowsDeployThread(DeployThread):
 			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
 			if hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
+
+	def _getHostId(self, host):
+		try:
+			super(C, self)._getHostId(host)
+		except socket.herror as error:
+			try:
+				output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
+				for line in output:
+					if line.strip():
+						host = line.strip()
+						break
+			except Exception as error:
+				logger.debug("Name lookup via winexe failed: {0}".format(error))
+				raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
+
+		return self._normaliseHostId(host)
 
 	def _testWinexeConnection(self, networkAddress):
 		logger.notice(u"Testing winexe")
