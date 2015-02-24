@@ -534,16 +534,16 @@ def main(argv):
 						)
 	parser.add_argument('-p', dest="password", default=u"",
 						help=u"password for authentication")
-	group = parser.add_mutually_exclusive_group()
-	group.add_argument('-c', '--use-fqdn', dest="useFQDN",
-						action="store_true",
-						help=u"Use FQDN to connect to client.")
-	group.add_argument('--use-hostname', dest="useNetbios",
-						action="store_true",
-						help=u"Use hostname to connect to client. (Default)")
-	group.add_argument('--use-ip-address', dest="useIPAddress",
-						action='store_true',
-						help="Use IP address to connect to client.")
+	networkAccessGroup = parser.add_mutually_exclusive_group()
+	networkAccessGroup.add_argument('-c', '--use-fqdn', dest="useFQDN",
+									action="store_true",
+									help=u"Use FQDN to connect to client.")
+	networkAccessGroup.add_argument('--use-hostname', dest="useNetbios",
+									action="store_true",
+									help=u"Use hostname to connect to client. (Default)")
+	networkAccessGroup.add_argument('--use-ip-address', dest="useIPAddress",
+									action='store_true',
+									help="Use IP address to connect to client.")
 	parser.add_argument('-x', dest="stopOnPingFailure", default=True,
 						action="store_false",
 						help=u"try installation even if ping fails")
@@ -562,11 +562,11 @@ def main(argv):
 						help=u"skip known opsi clients")
 	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
 						help=u"number of concurrent deployment threads")
-	group = parser.add_mutually_exclusive_group()
-	group.add_argument('--client-side-mount', dest="clientSideMount",
+	mountGroup = parser.add_mutually_exclusive_group()
+	mountGroup.add_argument('--client-side-mount', dest="clientSideMount",
 						action="store_true",
 						help=u"Mount the client's C$-share via smbclient.")
-	group.add_argument('--server-side-mount', dest="clientSideMount",
+	mountGroup.add_argument('--server-side-mount', dest="clientSideMount",
 						default=True, action="store_false",
 						help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the old script.")
 	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
