@@ -364,8 +364,10 @@ class WindowsDeployThread(DeployThread):
 
 	def _getHostId(self, host):
 		try:
-			super(C, self)._getHostId(host)
+			return super(C, self)._getHostId(host)
 		except socket.herror as error:
+			ip = forceIPAddress(host)
+
 			try:
 				output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
 				for line in output:
