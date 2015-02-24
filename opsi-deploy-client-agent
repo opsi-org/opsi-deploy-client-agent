@@ -633,7 +633,7 @@ def main(argv):
 
 	if not args.clientSideMount:
 		if os.getuid() != 0:
-			raise Exception("You have to be root to use server-side-mouting.")
+			raise Exception("You have to be root to use mount.")
 
 	if args.useIPAddress:
 		deploymentMethod = "ip"
