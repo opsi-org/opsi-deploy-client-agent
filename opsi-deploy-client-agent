@@ -515,6 +515,18 @@ class DeployThread(threading.Thread):
 					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
 
 
+class WindowsDeployThread(DeployThread):
+	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
+			deploymentMethod="hostname", stopOnPingFailure=True,
+			skipExistingClient=False, clientSideMount=True,
+			keepClientOnFailure=False):
+
+	DeployThread.__init__(self, host, backend, username, password, shutdown,
+		reboot, startService, deploymentMethod, stopOnPingFailure,
+		skipExistingClient, clientSideMount, keepClientOnFailure)
+
+
+
 def main(argv):
 	parser = argparse.ArgumentParser(
 		description=(
@@ -574,6 +586,13 @@ def main(argv):
 						help=(u"If the client was created in opsi and "
 								u"anything fails after that the client is "
 								u"not removed."))
+	osGroup = parser.add_mutually_exclusive_group()
+	osGroup.add_argument('--windows', dest="deployWindows",
+						default=True, action="store_true",
+						help=u"Deploy onto a Microsoft Windows.")
+	osGroup.add_argument('--linux', dest="deployWindows",
+						action="store_false",
+						help=u"Deploy onto a Linux System.")
 	parser.add_argument('host', nargs='*',
 						help='The hosts to deploy the opsi-client-agent to.')
 
@@ -644,18 +663,23 @@ def main(argv):
 				break
 
 		host = hosts.pop()
-		thread = DeployThread(host, backend,
-			args.username,
-			password,
-			args.shutdown,
-			args.reboot,
-			args.startService,
-			deploymentMethod,
-			args.stopOnPingFailure,
-			args.skipExistingClient,
-			args.clientSideMount,
-			args.keepClientOnFailure
-		)
+
+		if args.deployWindows:
+			thread = WindowsDeployThread(host, backend,
+				args.username,
+				password,
+				args.shutdown,
+				args.reboot,
+				args.startService,
+				deploymentMethod,
+				args.stopOnPingFailure,
+				args.skipExistingClient,
+				args.clientSideMount,
+				args.keepClientOnFailure
+			)
+		else:
+			raise NotImplementedError("Still missing.")
+
 		thread.start()
 		runningThreads.append(thread)
 		time.sleep(0.5)
