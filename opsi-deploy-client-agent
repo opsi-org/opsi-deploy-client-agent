@@ -364,7 +364,7 @@ class WindowsDeployThread(DeployThread):
 
 	def _getHostId(self, host):
 		try:
-			return super(C, self)._getHostId(host)
+			return super(WindowsDeployThread, self)._getHostId(host)
 		except socket.herror as error:
 			ip = forceIPAddress(host)
 
