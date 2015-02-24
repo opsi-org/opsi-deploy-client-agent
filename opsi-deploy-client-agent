@@ -43,7 +43,7 @@ import threading
 import time
 
 from OPSI.Backend.BackendManager import BackendManager
-from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR
+from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR, LOG_NOTICE
 from OPSI.Object import OpsiClient, ProductOnClient
 from OPSI.System import copy, execute, getFQDN, umount, which
 from OPSI.Types import forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower
@@ -561,6 +561,8 @@ class LinuxDeployThread(DeployThread):
 
 
 def main(argv):
+	logger.setConsoleLevel(LOG_NOTICE)
+
 	parser = argparse.ArgumentParser(
 		description=(
 			u"Deploy opsi client agent to the specified clients.\n"
@@ -623,9 +625,14 @@ def main(argv):
 	osGroup.add_argument('--windows', dest="deployWindows",
 						default=True, action="store_true",
 						help=u"Deploy onto a Microsoft Windows.")
-	osGroup.add_argument('--linux', dest="deployWindows",
-						action="store_false",
-						help=u"Deploy onto a Linux System.")
+
+	if paramiko is not None:
+		osGroup.add_argument('--linux', dest="deployWindows",
+							action="store_false",
+							help=u"Deploy onto a Linux System.")
+	else:
+		logger.notice("Could not import 'paramiko'. Deploying to Linux not possible.")
+
 	parser.add_argument('host', nargs='*',
 						help='The hosts to deploy the opsi-client-agent to.')
 
@@ -677,6 +684,11 @@ def main(argv):
 	else:
 		deploymentMethod = "auto"
 
+	if args.deployWindows:
+		deploymentClass = WindowsDeployThread
+	else:
+		deploymentClass = LinuxDeployThread
+
 	# Create BackendManager
 	backend = BackendManager(
 		dispatchConfigFile=u'/etc/opsi/backendManager/dispatch.conf',
@@ -697,32 +709,18 @@ def main(argv):
 
 		host = hosts.pop()
 
-		if args.deployWindows:
-			thread = WindowsDeployThread(host, backend,
-				args.username,
-				password,
-				args.shutdown,
-				args.reboot,
-				args.startService,
-				deploymentMethod,
-				args.stopOnPingFailure,
-				args.skipExistingClient,
-				args.clientSideMount,
-				args.keepClientOnFailure
-			)
-		else:
-			thread = LinuxDeployThread(host, backend,
-				args.username,
-				password,
-				args.shutdown,
-				args.reboot,
-				args.startService,
-				deploymentMethod,
-				args.stopOnPingFailure,
-				args.skipExistingClient,
-				args.clientSideMount,
-				args.keepClientOnFailure
-			)
+		thread = deploymentClass(host, backend,
+			args.username,
+			password,
+			args.shutdown,
+			args.reboot,
+			args.startService,
+			deploymentMethod,
+			args.stopOnPingFailure,
+			args.skipExistingClient,
+			args.clientSideMount,
+			args.keepClientOnFailure
+		)
 
 		thread.start()
 		runningThreads.append(thread)
