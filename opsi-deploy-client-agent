@@ -562,9 +562,13 @@ def main(argv):
 						help=u"skip known opsi clients")
 	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
 						help=u"number of concurrent deployment threads")
-	parser.add_argument('--server-side-mount', dest="clientSideMount",
+	group = parser.add_mutually_exclusive_group()
+	group.add_argument('--client-side-mount', dest="clientSideMount",
+						action="store_true",
+						help=u"Mount the client's C$-share via smbclient.")
+	group.add_argument('--server-side-mount', dest="clientSideMount",
 						default=True, action="store_false",
-						help=u"Mount the client's C$-share on the server for copying the files. This imitates the behaviour of the old script.")
+						help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the old script.")
 	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
 						default=False, action="store_true",
 						help=(u"If the client was created in opsi and "
