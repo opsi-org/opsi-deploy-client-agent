@@ -127,83 +127,6 @@ class DeployThread(threading.Thread):
 			logger.debug("Not a valid IP. Assuming FQDN.")
 			self.deploymentMethod = "fqdn"
 
-	def run(self):
-		if self.clientSideMount:
-			self._installWithClientSideMount()
-		else:
-			self._installWithServersideMount()
-
-	def _installWithClientSideMount(self):
-		logger.debug('Installing using client-side mount.')
-		host = forceUnicodeLower(self.host)
-		hostId = u''
-		hostObj = None
-		try:
-			hostId = self._getHostId(host)
-			hostName = host.split('.')[0]
-			self._checkIfClientShouldBeSkipped(hostId)
-
-			logger.notice(u"Starting deployment to host '%s'" % hostId)
-
-			ipAddress = self._getIpAddress(hostId, hostName)
-			self._pingClient(ipAddress)
-
-			self._createHostIfNotExisting(hostId, ipAddress)
-			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
-
-			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
-			self._testWinexeConnection(networkAddress)
-
-			logger.notice(u"Patching config.ini")
-			configIniName = u'%s_config.ini' % randomString(10)
-			copy(os.path.join(u'files', u'opsi', u'cfg', u'config.ini'), '/tmp/%s' % configIniName)
-			configFile = IniFile('/tmp/%s' % configIniName)
-			config = configFile.parse()
-			if not config.has_section('shareinfo'):
-				config.add_section('shareinfo')
-			config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
-			if not config.has_section('general'):
-				config.add_section('general')
-			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
-			configFile.generate(config)
-
-			try:
-				logger.notice(u"Copying installation files")
-				cmd = u"%s //%s/c$ -U '%s' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put %s config.ini; exit;'" \
-					% (which('smbclient'), networkAddress, self.username + '%' + self.password.replace("'", "'\"'\"'"), configIniName)
-				execute(cmd)
-
-				logger.notice(u"Installing opsi-client-agent")
-				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
-				for trynum in (1, 2):
-					try:
-						winexe(cmd, networkAddress, self.username, self.password)
-						break
-					except Exception as error:
-						if trynum == 2:
-							raise Exception(u"Failed to install opsi-client-agent: %s" % error)
-						logger.info(u"Winexe failure '%s', retrying" % error)
-						time.sleep(2)
-			finally:
-				os.remove('/tmp/%s' % configIniName)
-
-				try:
-					cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst"'
-					winexe(cmd, networkAddress, self.username, self.password)
-				except Exception as error:
-					logger.error(error)
-
-			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
-			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation(networkAddress)
-		except SkipClientException:
-			logger.notice(u"Skipping host '%s'" % hostId)
-			return
-		except Exception as error:
-			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
-			if hostObj and not self.keepClientOnFailure:
-				self._removeHostFromBackend(hostObj)
-
 	def _getHostId(self, host):
 		if self.deploymentMethod == 'ip':
 			ip = forceIPAddress(host)
@@ -334,6 +257,111 @@ class DeployThread(threading.Thread):
 		else:
 			return ipAddress
 
+	def _setOpsiClientAgentToInstalled(self, hostId):
+		poc = ProductOnClient(
+			productType=u'LocalbootProduct',
+			clientId=hostId,
+			productId=u'opsi-client-agent',
+			installationStatus=u'installed',
+			actionResult=u'successful'
+		)
+		self.backend.productOnClient_updateObjects([poc])
+
+	def _removeHostFromBackend(self, host):
+		try:
+			logger.notice('Deleting client {0} from backend.'.format(host))
+			self.backend.host_deleteObjects([host])
+		except Exception as error:
+			logger.error(error)
+
+
+class WindowsDeployThread(DeployThread):
+	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
+			deploymentMethod="hostname", stopOnPingFailure=True,
+			skipExistingClient=False, clientSideMount=True,
+			keepClientOnFailure=False):
+
+		DeployThread.__init__(self, host, backend, username, password, shutdown,
+			reboot, startService, deploymentMethod, stopOnPingFailure,
+			skipExistingClient, clientSideMount, keepClientOnFailure)
+
+	def run(self):
+		if self.clientSideMount:
+			self._installWithClientSideMount()
+		else:
+			self._installWithServersideMount()
+
+	def _installWithClientSideMount(self):
+		logger.debug('Installing using client-side mount.')
+		host = forceUnicodeLower(self.host)
+		hostId = u''
+		hostObj = None
+		try:
+			hostId = self._getHostId(host)
+			hostName = host.split('.')[0]
+			self._checkIfClientShouldBeSkipped(hostId)
+
+			logger.notice(u"Starting deployment to host '%s'" % hostId)
+
+			ipAddress = self._getIpAddress(hostId, hostName)
+			self._pingClient(ipAddress)
+
+			self._createHostIfNotExisting(hostId, ipAddress)
+			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
+
+			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
+			self._testWinexeConnection(networkAddress)
+
+			logger.notice(u"Patching config.ini")
+			configIniName = u'%s_config.ini' % randomString(10)
+			copy(os.path.join(u'files', u'opsi', u'cfg', u'config.ini'), '/tmp/%s' % configIniName)
+			configFile = IniFile('/tmp/%s' % configIniName)
+			config = configFile.parse()
+			if not config.has_section('shareinfo'):
+				config.add_section('shareinfo')
+			config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
+			if not config.has_section('general'):
+				config.add_section('general')
+			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
+			configFile.generate(config)
+
+			try:
+				logger.notice(u"Copying installation files")
+				cmd = u"%s //%s/c$ -U '%s' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put %s config.ini; exit;'" \
+					% (which('smbclient'), networkAddress, self.username + '%' + self.password.replace("'", "'\"'\"'"), configIniName)
+				execute(cmd)
+
+				logger.notice(u"Installing opsi-client-agent")
+				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
+				for trynum in (1, 2):
+					try:
+						winexe(cmd, networkAddress, self.username, self.password)
+						break
+					except Exception as error:
+						if trynum == 2:
+							raise Exception(u"Failed to install opsi-client-agent: %s" % error)
+						logger.info(u"Winexe failure '%s', retrying" % error)
+						time.sleep(2)
+			finally:
+				os.remove('/tmp/%s' % configIniName)
+
+				try:
+					cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst"'
+					winexe(cmd, networkAddress, self.username, self.password)
+				except Exception as error:
+					logger.error(error)
+
+			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			self._setOpsiClientAgentToInstalled(hostId)
+			self._finaliseInstallation(networkAddress)
+		except SkipClientException:
+			logger.notice(u"Skipping host '%s'" % hostId)
+			return
+		except Exception as error:
+			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
+			if hostObj and not self.keepClientOnFailure:
+				self._removeHostFromBackend(hostObj)
+
 	def _testWinexeConnection(self, networkAddress):
 		logger.notice(u"Testing winexe")
 		cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
@@ -351,16 +379,6 @@ class DeployThread(threading.Thread):
 					raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
 				logger.info(u"Winexe failure '%s', retrying" % error)
 				time.sleep(2)
-
-	def _setOpsiClientAgentToInstalled(self, hostId):
-		poc = ProductOnClient(
-			productType=u'LocalbootProduct',
-			clientId=hostId,
-			productId=u'opsi-client-agent',
-			installationStatus=u'installed',
-			actionResult=u'successful'
-		)
-		self.backend.productOnClient_updateObjects([poc])
 
 	def _finaliseInstallation(self, networkAddress):
 		if self.reboot or self.shutdown:
@@ -406,13 +424,6 @@ class DeployThread(threading.Thread):
 				winexe(u'net start opsiclientd', networkAddress, self.username, self.password)
 			except Exception as error:
 				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=networkAddress, error=error))
-
-	def _removeHostFromBackend(self, host):
-		try:
-			logger.notice('Deleting client {0} from backend.'.format(host))
-			self.backend.host_deleteObjects([host])
-		except Exception as error:
-			logger.error(error)
 
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
@@ -515,16 +526,27 @@ class DeployThread(threading.Thread):
 					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
 
 
-class WindowsDeployThread(DeployThread):
+class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
-			deploymentMethod="hostname", stopOnPingFailure=True,
-			skipExistingClient=False, clientSideMount=True,
-			keepClientOnFailure=False):
+		deploymentMethod="hostname", stopOnPingFailure=True,
+		skipExistingClient=False, clientSideMount=True,
+		keepClientOnFailure=False):
 
-	DeployThread.__init__(self, host, backend, username, password, shutdown,
+		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, clientSideMount, keepClientOnFailure)
 
+	def run(self):
+		if self.clientSideMount:
+			self._installWithClientSideMount()
+		else:
+			self._installWithServersideMount()
+
+	def _installWithClientSideMount(self):
+		raise NotImplementedError("Still working on client-side-mount.")
+
+	def _installWithServersideMount(self):
+		raise NotImplementedError("Still working on server-side-mount.")
 
 
 def main(argv):
@@ -678,7 +700,18 @@ def main(argv):
 				args.keepClientOnFailure
 			)
 		else:
-			raise NotImplementedError("Still missing.")
+			thread = LinuxDeployThread(host, backend,
+				args.username,
+				password,
+				args.shutdown,
+				args.reboot,
+				args.startService,
+				deploymentMethod,
+				args.stopOnPingFailure,
+				args.skipExistingClient,
+				args.clientSideMount,
+				args.keepClientOnFailure
+			)
 
 		thread.start()
 		runningThreads.append(thread)
