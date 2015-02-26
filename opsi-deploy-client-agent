@@ -92,7 +92,7 @@ class SkipClientException(Exception):
 class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 				deploymentMethod="auto", stopOnPingFailure=True,
-				skipExistingClient=False, clientSideMount=True,
+				skipExistingClient=False, mountWithSmbclient=True,
 				keepClientOnFailure=False):
 
 		threading.Thread.__init__(self)
@@ -105,7 +105,7 @@ class DeployThread(threading.Thread):
 		self.startService = startService
 		self.stopOnPingFailure = stopOnPingFailure
 		self.skipExistingClient = skipExistingClient
-		self.clientSideMount = clientSideMount
+		self.mountWithSmbclient = mountWithSmbclient
 
 		deploymentMethod = forceUnicodeLower(deploymentMethod)
 		if deploymentMethod == "auto":
@@ -278,20 +278,20 @@ class DeployThread(threading.Thread):
 class WindowsDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 			deploymentMethod="hostname", stopOnPingFailure=True,
-			skipExistingClient=False, clientSideMount=True,
+			skipExistingClient=False, mountWithSmbclient=True,
 			keepClientOnFailure=False):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
-			skipExistingClient, clientSideMount, keepClientOnFailure)
+			skipExistingClient, mountWithSmbclient, keepClientOnFailure)
 
 	def run(self):
-		if self.clientSideMount:
-			self._installWithClientSideMount()
+		if self.mountWithSmbclient:
+			self._installWithSmbclient()
 		else:
 			self._installWithServersideMount()
 
-	def _installWithClientSideMount(self):
+	def _installWithSmbclient(self):
 		logger.debug('Installing using client-side mount.')
 		host = forceUnicodeLower(self.host)
 		hostId = u''
@@ -547,12 +547,12 @@ class WindowsDeployThread(DeployThread):
 class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 		deploymentMethod="hostname", stopOnPingFailure=True,
-		skipExistingClient=False, clientSideMount=True,
+		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
-		skipExistingClient, clientSideMount, keepClientOnFailure)
+		skipExistingClient, mountWithSmbclient, keepClientOnFailure)
 
 		self._sshConnection = None
 
@@ -773,12 +773,12 @@ def main(argv):
 	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
 						help=u"number of concurrent deployment threads")
 	mountGroup = parser.add_mutually_exclusive_group()
-	mountGroup.add_argument('--client-side-mount', dest="clientSideMount",
+	mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
 						action="store_true",
 						help=u"Mount the client's C$-share via smbclient.")
-	mountGroup.add_argument('--server-side-mount', dest="clientSideMount",
+	mountGroup.add_argument('--mount', dest="mountWithSmbclient",
 						default=True, action="store_false",
-						help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the old script.")
+						help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
 	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
 						default=False, action="store_true",
 						help=(u"If the client was created in opsi and "
@@ -834,7 +834,7 @@ def main(argv):
 	if maxThreads < 1:
 		maxThreads = 1
 
-	if not args.clientSideMount:
+	if not args.mountWithSmbclient:
 		if os.getuid() != 0:
 			raise Exception("You have to be root to use mount.")
 
@@ -881,7 +881,7 @@ def main(argv):
 			deploymentMethod,
 			args.stopOnPingFailure,
 			args.skipExistingClient,
-			args.clientSideMount,
+			args.mountWithSmbclient,
 			args.keepClientOnFailure
 		)
 
