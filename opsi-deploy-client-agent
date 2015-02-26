@@ -671,7 +671,7 @@ class LinuxDeployThread(DeployThread):
 		self._connectViaSSH(networkAddress)
 
 		ftpConnection = self._sshConnection.open_sftp()
-		ftpConnection.put(localpath, remotePath)
+		ftpConnection.put(localPath, remotePath)
 		ftpConnection.close()
 
 	def _copyDirectoryOverSSH(self, networkAddress, localPath, remotePath):
