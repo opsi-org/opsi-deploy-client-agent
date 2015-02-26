@@ -722,6 +722,10 @@ class LinuxDeployThread(DeployThread):
 def main(argv):
 	logger.setConsoleLevel(LOG_NOTICE)
 
+	# If we are inside a folder with 'opsi-linux-client-agent' in it's
+	# name we assume that we want to deploy the opsi-linux-client-agent.
+	deployLinux = 'opsi-linux-client-agent' in os.path.dirname(os.path.abspath(__file__))
+
 	parser = argparse.ArgumentParser(
 		description=(
 			u"Deploy opsi client agent to the specified clients.\n"
@@ -782,7 +786,7 @@ def main(argv):
 								u"not removed."))
 	osGroup = parser.add_mutually_exclusive_group()
 	osGroup.add_argument('--windows', dest="deployWindows",
-						default=True, action="store_true",
+						default=not deployLinux, action="store_true",
 						help=u"Deploy onto a Microsoft Windows.")
 
 	if paramiko is not None:
