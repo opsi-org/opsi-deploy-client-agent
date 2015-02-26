@@ -142,10 +142,6 @@ class DeployThread(threading.Thread):
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
 				raise error
 
-		return self._normaliseHostId(host)
-
-	@staticmethod
-	def _normaliseHostId(host):
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
@@ -363,22 +359,39 @@ class WindowsDeployThread(DeployThread):
 				self._removeHostFromBackend(hostObj)
 
 	def _getHostId(self, host):
-		try:
-			return super(WindowsDeployThread, self)._getHostId(host)
-		except socket.herror as error:
+		if self.deploymentMethod == 'ip':
 			ip = forceIPAddress(host)
-
 			try:
-				output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
-				for line in output:
-					if line.strip():
-						host = line.strip()
-						break
-			except Exception as error:
-				logger.debug("Name lookup via winexe failed: {0}".format(error))
-				raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
+				(hostname, _, _) = socket.gethostbyaddr(ip)
+				host = hostname
+			except socket.herror as error:
+				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
 
-		return self._normaliseHostId(host)
+				try:
+					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
+					for line in output:
+						if line.strip():
+							host = line.strip()
+							break
+				except Exception as error:
+					logger.debug("Name lookup via winexe failed: {0}".format(error))
+					raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
+
+		host = host.replace('_', '-')
+
+		if host.count(u'.') < 2:
+			try:
+				host = socket.getfqdn(socket.gethostbyname(host))
+			except socket.gaierror as error:
+				logger.debug("Lookup of {0} failed.".format(host))
+
+		if host.count(u'.') < 2:
+			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
+		else:
+			hostId = forceHostId(host)
+
+		logger.info("Got hostId {0}".format(hostId))
+		return hostId
 
 	def _testWinexeConnection(self, networkAddress):
 		logger.notice(u"Testing winexe")
