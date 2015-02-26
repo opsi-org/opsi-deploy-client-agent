@@ -794,24 +794,20 @@ def main(argv):
 						help=(u"If the client was created in opsi and "
 								u"anything fails after that the client is "
 								u"not removed."))
-	osGroup = parser.add_mutually_exclusive_group()
-	osGroup.add_argument('--windows', dest="deployWindows",
-						default=not deployLinux, action="store_true",
-						help=u"Deploy onto a Microsoft Windows.")
-
-	if paramiko is not None:
-		osGroup.add_argument('--linux', dest="deployWindows",
-							action="store_false",
-							help=u"Deploy onto a Linux System.")
-	else:
-		logger.notice("Could not import 'paramiko'. Deploying to Linux not possible.")
-
 	parser.add_argument('host', nargs='*',
-						help='The hosts to deploy the opsi-client-agent to.')
+						help=u'The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args(argv)
 
 	logger.setConsoleLevel(args.logLevel)
+
+	if deployLinux and paramiko is None:
+		message = (
+			u"Could not import 'paramiko'. "
+			u"Deploying to Linux not possible."
+		)
+		logger.critical(message)
+		raise Exception(message)
 
 	hosts = args.host
 	if args.hostFile:
@@ -857,7 +853,8 @@ def main(argv):
 	else:
 		deploymentMethod = "auto"
 
-	if args.deployWindows:
+	if not deployLinux:
+		logger.info("Deploying to Windows.")
 		deploymentClass = WindowsDeployThread
 	else:
 		deploymentClass = LinuxDeployThread
