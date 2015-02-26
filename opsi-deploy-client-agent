@@ -554,6 +554,8 @@ class LinuxDeployThread(DeployThread):
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, clientSideMount, keepClientOnFailure)
 
+		self._sshConnection = None
+
 	def run(self):
 		if self.clientSideMount:
 			self._installWithClientSideMount()
@@ -561,7 +563,157 @@ class LinuxDeployThread(DeployThread):
 			self._installWithServersideMount()
 
 	def _installWithClientSideMount(self):
-		raise NotImplementedError("Still working on client-side-mount.")
+		logger.debug('Installing with files copied to client via scp.')
+		host = forceUnicodeLower(self.host)
+		hostId = u''
+		hostObj = None
+		try:
+			hostId = self._getHostId(host)
+			hostName = host.split('.')[0]
+			self._checkIfClientShouldBeSkipped(hostId)
+
+			logger.notice(u"Starting deployment to host '%s'" % hostId)
+			ipAddress = self._getIpAddress(hostId, hostName)
+			self._pingClient(ipAddress)
+
+			self._createHostIfNotExisting(hostId, ipAddress)
+			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
+
+			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
+
+			self._executeViaSSH(networkAddress, "echo 'it works'")
+
+			logger.notice(u"Patching config.ini")
+			configIniName = u'%s_config.ini' % randomString(10)
+			configIniPath = os.path.join('/tmp', configIniName)
+			copy(os.path.join(u'files', u'opsi', u'cfg', u'config.ini'), '/tmp/%s' % configIniName)
+			configFile = IniFile('/tmp/%s' % configIniName)
+			config = configFile.parse()
+			if not config.has_section('shareinfo'):
+				config.add_section('shareinfo')
+			config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
+			if not config.has_section('general'):
+				config.add_section('general')
+			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
+			configFile.generate(config)
+
+			remoteFolder = os.path.join('/tmp', 'opsi-linux-client-agent')
+
+			try:
+				self._copyDirectoryOverSSH(
+					networkAddress,
+					os.path.join(os.path.dirname(__file__), 'files'),
+					remoteFolder
+				)
+
+				# Patched config
+				self._copyFileOverSSH(networkAddress, configIniPath, os.path.join(remoteFolder, 'files', 'opsi', 'cfg', 'config.ini'))
+
+				(_, stdout, _) = self._executeViaSSH(networkAddress, 'uname -m')
+				if "64" not in ''.join(stdout.readlines()):
+					remoteArch = "32"
+				else:
+					remoteArch = "64"
+
+				# TODO: sudo not needed everywhere - try with and without
+				installCommand = "sudo /tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
+				self._executeViaSSH(networkAddress, installCommand)
+			finally:
+				os.remove(configIniPath)
+
+				try:
+					self._executeViaSSH(networkAddress, "rm -rf {tempfolder}".format(tempfolder=remoteFolder))
+				except Exception as error:
+					logger.error(error)
+
+			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			self._setOpsiClientAgentToInstalled(hostId)
+			self._finaliseInstallation(networkAddress)
+		except SkipClientException:
+			logger.notice(u"Skipping host '%s'" % hostId)
+			return
+		except (Exception, paramiko.SSHException) as error:
+			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
+			if hostObj and not self.keepClientOnFailure:
+				self._removeHostFromBackend(hostObj)
+
+			if self._sshConnection is not None:
+				try:
+					self._sshConnection.close()
+				except Exception as error:
+					logger.debug2("Closing SSH connection failed: {0}".format(error))
+
+	def _executeViaSSH(self, networkAddress, command):
+		"""
+		Executing a command via SSH.
+
+		Will return the filehandles for stdin, stdout, stderr in a tuple.
+		"""
+		self._connectViaSSH(networkAddress)
+
+		logger.debug("Executing on remote: {0}".format(command))
+		(stdin, stdout, stderr) = self._sshConnection.exec_command(command)
+		return (stdin, stdout, stderr)
+
+	def _connectViaSSH(self, networkAddress):
+		if self._sshConnection is not None:
+			return
+
+		self._sshConnection = paramiko.SSHClient()
+		self._sshConnection.load_system_host_keys()
+		self._sshConnection.set_missing_host_key_policy(paramiko.WarningPolicy())
+
+		logger.debug("Connecting via SSH...")
+		self._sshConnection.connect(
+			hostname=networkAddress,
+			username=self.username,
+			password=self.password
+		)
+
+	def _copyFileOverSSH(self, networkAddress, localPath, remotePath):
+		self._connectViaSSH(networkAddress)
+
+		ftpConnection = self._sshConnection.open_sftp()
+		ftpConnection.put(localpath, remotePath)
+		ftpConnection.close()
+
+	def _copyDirectoryOverSSH(self, networkAddress, localPath, remotePath):
+		self._connectViaSSH(networkAddress)
+
+		ftpConnection = self._sshConnection.open_sftp()
+
+		for (dirpath, dirnames, filenames) in os.walk(localPath):
+			try:
+				ftpConnection.mkdir(os.path.join(remotePath, dirpath))
+			except Exception as error:
+				logger.debug2("Can't create {0} on remote: {1}".format(dirpath, error))
+
+			for filename in filenames:
+				ftpConnection.put(
+					os.path.join(dirpath, filename),
+					os.path.join(remotePath, dirpath, filename)
+				)
+
+		ftpConnection.close()
+
+	def _finaliseInstallation(self, networkAddress):
+		if self.reboot:
+			logger.notice(u"Rebooting machine '%s'" % networkAddress)
+			try:
+				self._executeViaSSH(networkAddress, "shutdown -r now")
+			except Exception as error:
+				logger.error(u"Failed to reboot computer: %s" % error)
+		elif self.shutdown:
+			logger.notice(u"Shutting down machine '%s'" % networkAddress)
+			try:
+				self._executeViaSSH(networkAddress, "shutdown -h now")
+			except Exception as error:
+				logger.error(u"Failed to shutdown computer: %s" % error)
+		elif self.startService:
+			try:
+				self._executeViaSSH(networkAddress, "service opsiclientd start || echo 'Already started.'")
+			except Exception as error:
+				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=networkAddress, error=error))
 
 	def _installWithServersideMount(self):
 		raise NotImplementedError("Still working on server-side-mount.")
