@@ -750,19 +750,20 @@ def main(argv):
 		))
 
 	parser = argparse.ArgumentParser(description=scriptDescription)
-	parser.add_argument('-V', action='version', version=__version__)
-	parser.add_argument('-v', dest="logLevel", default=LOG_WARNING, action="count",
+	parser.add_argument('--version', '-V', action='version', version=__version__)
+	parser.add_argument('--verbose', '-v',
+						dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
-	parser.add_argument('-u', dest="username", default=u"Administrator",
+	parser.add_argument('--username', '-u', dest="username", default=u"Administrator",
 						help=(
 							u'username for authentication (default: Administrator).\n'
 							u"example for a domain account: -u \"<DOMAIN>\\\\<username>\""
 							)
 						)
-	parser.add_argument('-p', dest="password", default=u"",
+	parser.add_argument('--password', '-p', dest="password", default=u"",
 						help=u"password for authentication")
 	networkAccessGroup = parser.add_mutually_exclusive_group()
-	networkAccessGroup.add_argument('-c', '--use-fqdn', dest="useFQDN",
+	networkAccessGroup.add_argument('--use-fqdn', '-c', dest="useFQDN",
 									action="store_true",
 									help=u"Use FQDN to connect to client.")
 	networkAccessGroup.add_argument('--use-hostname', dest="useNetbios",
@@ -771,23 +772,31 @@ def main(argv):
 	networkAccessGroup.add_argument('--use-ip-address', dest="useIPAddress",
 									action='store_true',
 									help="Use IP address to connect to client.")
-	parser.add_argument('-x', dest="stopOnPingFailure", default=True,
+	parser.add_argument('--ignore-failed-ping', '-x',
+						dest="stopOnPingFailure", default=True,
 						action="store_false",
 						help=u"try installation even if ping fails")
-	parser.add_argument('-r', dest="reboot", default=False, action="store_true",
-						help=u"reboot computer after installation")
-	parser.add_argument('-s', dest="shutdown", default=False,
-						action="store_true",
-						help=u"shutdown computer after installation")
-	parser.add_argument('-o', dest="startService", default=False,
-						action="store_true",
-						help=u"start opsiclientd service after installation")
-	parser.add_argument('-f', dest="hostFile", default=None,
+	postInstallationAction = parser.add_mutually_exclusive_group()
+	postInstallationAction.add_argument('--reboot', '-r',
+										dest="reboot", default=False,
+										action="store_true",
+										help=u"reboot computer after installation")
+	postInstallationAction.add_argument('--shutdown', '-s',
+										dest="shutdown", default=False,
+										action="store_true",
+										help=u"shutdown computer after installation")
+	postInstallationAction.add_argument('--start-opsiclientd', '-o',
+										dest="startService", default=False,
+										action="store_true",
+										help=u"start opsiclientd service after installation")
+	parser.add_argument('--hosts-from-file', '-f',
+						dest="hostFile", default=None,
 						help=u"file containing list of clients (one hostname per line)")
-	parser.add_argument('-S', dest="skipExistingClient", default=False,
-						action="store_true",
-						help=u"skip known opsi clients")
-	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
+	parser.add_argument('--skip-existing-clients', '-S',
+						dest="skipExistingClient", default=False,
+						action="store_true", help=u"skip known opsi clients")
+	parser.add_argument('--threads', '-t', dest="maxThreads", default=1,
+						type=int,
 						help=u"number of concurrent deployment threads")
 
 	if not deployLinux:
