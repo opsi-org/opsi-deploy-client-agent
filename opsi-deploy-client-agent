@@ -557,12 +557,9 @@ class LinuxDeployThread(DeployThread):
 		self._sshConnection = None
 
 	def run(self):
-		if self.clientSideMount:
-			self._installWithClientSideMount()
-		else:
-			self._installWithServersideMount()
+		self._installWithSSH()
 
-	def _installWithClientSideMount(self):
+	def _installWithSSH(self):
 		logger.debug('Installing with files copied to client via scp.')
 		host = forceUnicodeLower(self.host)
 		hostId = u''
