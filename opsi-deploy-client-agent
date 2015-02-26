@@ -736,13 +736,20 @@ def main(argv):
 	# name we assume that we want to deploy the opsi-linux-client-agent.
 	deployLinux = 'opsi-linux-client-agent' in os.path.dirname(os.path.abspath(__file__))
 
-	parser = argparse.ArgumentParser(
-		description=(
-			u"Deploy opsi client agent to the specified clients.\n"
-			u"The c$ and admin$ must be accessable on every client.\n"
+	scriptDescription = u"Deploy opsi client agent to the specified clients."
+	if deployLinux:
+		scriptDescription = '\n'.join((
+			scriptDescription,
+			u"The clients must be accessible via SSH.",
+		))
+	else:
+		scriptDescription = '\n'.join((
+			scriptDescription,
+			u"The c$ and admin$ must be accessible on every client.",
 			u"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
-		)
-	)
+		))
+
+	parser = argparse.ArgumentParser(description=scriptDescription)
 	parser.add_argument('-V', action='version', version=__version__)
 	parser.add_argument('-v', dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
