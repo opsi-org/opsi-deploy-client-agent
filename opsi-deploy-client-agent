@@ -782,13 +782,16 @@ def main(argv):
 						help=u"skip known opsi clients")
 	parser.add_argument('-t', dest="maxThreads", default=1, type=int,
 						help=u"number of concurrent deployment threads")
-	mountGroup = parser.add_mutually_exclusive_group()
-	mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
-						action="store_true",
-						help=u"Mount the client's C$-share via smbclient.")
-	mountGroup.add_argument('--mount', dest="mountWithSmbclient",
-						default=True, action="store_false",
-						help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
+
+	if not deployLinux:
+		mountGroup = parser.add_mutually_exclusive_group()
+		mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
+							action="store_true",
+							help=u"Mount the client's C$-share via smbclient.")
+		mountGroup.add_argument('--mount', dest="mountWithSmbclient",
+							default=True, action="store_false",
+							help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
+
 	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
 						default=False, action="store_true",
 						help=(u"If the client was created in opsi and "
@@ -856,10 +859,10 @@ def main(argv):
 	if not deployLinux:
 		logger.info("Deploying to Windows.")
 		deploymentClass = WindowsDeployThread
+		mountWithSmbclient = args.mountWithSmbclient
 	else:
 		deploymentClass = LinuxDeployThread
-
-		logger.notice("Deploying to Linux, ignoring mount option.")
+		mountWithSmbclient = False
 
 	# Create BackendManager
 	backend = BackendManager(
@@ -890,7 +893,7 @@ def main(argv):
 			deploymentMethod,
 			args.stopOnPingFailure,
 			args.skipExistingClient,
-			args.mountWithSmbclient,
+			mountWithSmbclient,
 			args.keepClientOnFailure
 		)
 
