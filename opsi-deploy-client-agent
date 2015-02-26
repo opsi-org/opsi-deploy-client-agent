@@ -852,6 +852,8 @@ def main(argv):
 	else:
 		deploymentClass = LinuxDeployThread
 
+		logger.notice("Deploying to Linux, ignoring mount option.")
+
 	# Create BackendManager
 	backend = BackendManager(
 		dispatchConfigFile=u'/etc/opsi/backendManager/dispatch.conf',
