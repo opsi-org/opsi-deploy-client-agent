@@ -859,10 +859,6 @@ def main(argv):
 	if maxThreads < 1:
 		maxThreads = 1
 
-	if not args.mountWithSmbclient:
-		if os.getuid() != 0:
-			raise Exception("You have to be root to use mount.")
-
 	if args.useIPAddress:
 		deploymentMethod = "ip"
 	elif args.useNetbios:
@@ -876,6 +872,10 @@ def main(argv):
 		logger.info("Deploying to Windows.")
 		deploymentClass = WindowsDeployThread
 		mountWithSmbclient = args.mountWithSmbclient
+
+		if not mountWithSmbclient:
+			if os.getuid() != 0:
+				raise Exception("You have to be root to use mount.")
 	else:
 		deploymentClass = LinuxDeployThread
 		mountWithSmbclient = False
