@@ -42,6 +42,8 @@ import sys
 import threading
 import time
 
+from contextlib import contextmanager
+
 from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR, LOG_NOTICE
 from OPSI.Object import OpsiClient, ProductOnClient
@@ -691,23 +693,42 @@ class LinuxDeployThread(DeployThread):
 		ftpConnection.close()
 
 	def _copyDirectoryOverSSH(self, networkAddress, localPath, remotePath):
+		@contextmanager
+		def changeDirectory(path):
+			currentDir = os.getcwd()
+			os.chdir(path)
+			yield
+			os.chdir(currentDir)
+
+		def createFolderIfMissing(path):
+			try:
+				ftpConnection.mkdir(path)
+			except Exception as error:
+				logger.debug("Can't create {0} on remote: {1}".format(dirpath, error))
+
 		self._connectViaSSH(networkAddress)
 
 		ftpConnection = self._sshConnection.open_sftp()
+		createFolderIfMissing(remotePath)
 
-		for (dirpath, dirnames, filenames) in os.walk(localPath):
-			try:
-				ftpConnection.mkdir(os.path.join(remotePath, dirpath))
-			except Exception as error:
-				logger.debug2("Can't create {0} on remote: {1}".format(dirpath, error))
+		if not os.path.exists(localPath):
+			raise ValueError("Can't find local path '{0}'".format(localPath))
 
-			for filename in filenames:
-				ftpConnection.put(
-					os.path.join(dirpath, filename),
-					os.path.join(remotePath, dirpath, filename)
-				)
+		# The following stunt is necessary to get results in 'dirpath'
+		# that can be easily used for folder creation on the remote.
+		with changeDirectory(os.path.join(localPath, '..')):
+			directoryToWalk = os.path.basename(localPath)
+			for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
+				createFolderIfMissing(os.path.join(remotePath, dirpath))
 
-		ftpConnection.close()
+				for filename in filenames:
+					local = os.path.join(dirpath, filename)
+					remote = os.path.join(remotePath, dirpath, filename)
+
+					logger.debug2("Copying {0} -> {1}".format(local, remote))
+					ftpConnection.put(local, remote)
+
+			ftpConnection.close()
 
 	def _finaliseInstallation(self, networkAddress):
 		if self.reboot:
