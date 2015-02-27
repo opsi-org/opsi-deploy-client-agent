@@ -304,10 +304,10 @@ class WindowsDeployThread(DeployThread):
 		hostObj = None
 		try:
 			hostId = self._getHostId(host)
-			hostName = host.split('.')[0]
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
+			hostName = host.split('.')[0]
 
 			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
@@ -475,10 +475,10 @@ class WindowsDeployThread(DeployThread):
 		instDir = u''
 		try:
 			hostId = self._getHostId(host)
-			hostName = host.split('.')[0]
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
+			hostName = host.split('.')[0]
 
 			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
@@ -589,10 +589,11 @@ class LinuxDeployThread(DeployThread):
 		hostObj = None
 		try:
 			hostId = self._getHostId(host)
-			hostName = host.split('.')[0]
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
+			hostName = host.split('.')[0]
+
 			ipAddress = self._getIpAddress(hostId, hostName)
 			self._pingClient(ipAddress)
 
