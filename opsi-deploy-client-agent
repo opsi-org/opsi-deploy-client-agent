@@ -165,6 +165,15 @@ class DeployThread(threading.Thread):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 			raise SkipClientException("Client {0} exists.".format(hostId))
 
+	def _prepareDeploymentToHost(self, hostId):
+		hostName = hostId.split('.')[0]
+		ipAddress = self._getIpAddress(hostId, hostName)
+		self._pingClient(ipAddress)
+		self._setNetworkAddress(hostId, hostName, ipAddress)
+
+		self._createHostIfNotExisting(hostId, ipAddress)
+		return self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
+
 	def _getIpAddress(self, hostId, hostName):
 		if self.deploymentMethod == 'ip':
 			return forceIPAddress(self.host)
@@ -307,15 +316,7 @@ class WindowsDeployThread(DeployThread):
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
-			hostName = host.split('.')[0]
-
-			ipAddress = self._getIpAddress(hostId, hostName)
-			self._pingClient(ipAddress)
-
-			self._createHostIfNotExisting(hostId, ipAddress)
-			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
-
-			self._setNetworkAddress(hostId, hostName, ipAddress)
+			hostObj = self._prepareDeploymentToHost(hostId)
 			self._testWinexeConnection()
 
 			logger.notice(u"Patching config.ini")
@@ -478,15 +479,7 @@ class WindowsDeployThread(DeployThread):
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
-			hostName = host.split('.')[0]
-
-			ipAddress = self._getIpAddress(hostId, hostName)
-			self._pingClient(ipAddress)
-
-			self._createHostIfNotExisting(hostId, ipAddress)
-			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
-
-			self._setNetworkAddress(hostId, hostName, ipAddress)
+			hostObj = self._prepareDeploymentToHost(hostId)
 			self._testWinexeConnection()
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
@@ -592,15 +585,7 @@ class LinuxDeployThread(DeployThread):
 			self._checkIfClientShouldBeSkipped(hostId)
 
 			logger.notice(u"Starting deployment to host '%s'" % hostId)
-			hostName = host.split('.')[0]
-
-			ipAddress = self._getIpAddress(hostId, hostName)
-			self._pingClient(ipAddress)
-
-			self._createHostIfNotExisting(hostId, ipAddress)
-			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
-
-			self._setNetworkAddress(hostId, hostName, ipAddress)
+			hostObj = self._prepareDeploymentToHost(hostId)
 			self._executeViaSSH("echo 'it works'")
 
 			localFolder = os.path.dirname(os.path.abspath(__file__))
