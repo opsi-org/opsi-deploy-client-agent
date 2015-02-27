@@ -819,10 +819,10 @@ def main(argv):
 	if not deployLinux:
 		mountGroup = parser.add_mutually_exclusive_group()
 		mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
-								action="store_true",
+								default=True, action="store_true",
 								help=u"Mount the client's C$-share via smbclient.")
 		mountGroup.add_argument('--mount', dest="mountWithSmbclient",
-								default=True, action="store_false",
+								action="store_false",
 								help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
 
 	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
