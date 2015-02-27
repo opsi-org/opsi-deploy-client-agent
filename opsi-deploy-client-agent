@@ -119,6 +119,7 @@ class DeployThread(threading.Thread):
 			raise ValueError("Invalid deployment method: {0}".format(deploymentMethod))
 
 		self.keepClientOnFailure = keepClientOnFailure
+		self._networkAddress = None
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -247,13 +248,20 @@ class DeployThread(threading.Thread):
 
 		return mac
 
-	def _getNetworkAddress(self, hostId, hostName, ipAddress):
+	@property
+	def networkAddress(self):
+		if self._networkAddress is None:
+			raise ValueError("No network address set!")
+
+		return self._networkAddress
+
+	def _setNetworkAddress(self, hostId, hostName, ipAddress):
 		if self.deploymentMethod == 'hostname':
-			return hostName
+			self._networkAddress = hostName
 		elif self.deploymentMethod == 'fqdn':
-			return hostId
+			self._networkAddress = hostId
 		else:
-			return ipAddress
+			self._networkAddress = ipAddress
 
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
@@ -307,8 +315,8 @@ class WindowsDeployThread(DeployThread):
 			self._createHostIfNotExisting(hostId, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
-			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
-			self._testWinexeConnection(networkAddress)
+			self._setNetworkAddress(hostId, hostName, ipAddress)
+			self._testWinexeConnection()
 
 			logger.notice(u"Patching config.ini")
 			configIniName = u'%s_config.ini' % randomString(10)
@@ -326,14 +334,14 @@ class WindowsDeployThread(DeployThread):
 			try:
 				logger.notice(u"Copying installation files")
 				cmd = u"%s //%s/c$ -U '%s' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put %s config.ini; exit;'" \
-					% (which('smbclient'), networkAddress, self.username + '%' + self.password.replace("'", "'\"'\"'"), configIniName)
+					% (which('smbclient'), self.networkAddress, self.username + '%' + self.password.replace("'", "'\"'\"'"), configIniName)
 				execute(cmd)
 
 				logger.notice(u"Installing opsi-client-agent")
 				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
 				for trynum in (1, 2):
 					try:
-						winexe(cmd, networkAddress, self.username, self.password)
+						winexe(cmd, self.networkAddress, self.username, self.password)
 						break
 					except Exception as error:
 						if trynum == 2:
@@ -345,13 +353,13 @@ class WindowsDeployThread(DeployThread):
 
 				try:
 					cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst"'
-					winexe(cmd, networkAddress, self.username, self.password)
+					winexe(cmd, self.networkAddress, self.username, self.password)
 				except Exception as error:
 					logger.error(error)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation(networkAddress)
+			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
@@ -395,38 +403,38 @@ class WindowsDeployThread(DeployThread):
 		logger.info("Got hostId {0}".format(hostId))
 		return hostId
 
-	def _testWinexeConnection(self, networkAddress):
+	def _testWinexeConnection(self):
 		logger.notice(u"Testing winexe")
 		cmd = u'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
 		for trynum in (1, 2):
 			try:
-				winexe(cmd, networkAddress, self.username, self.password)
+				winexe(cmd, self.networkAddress, self.username, self.password)
 				break
 			except Exception as error:
 				if 'NT_STATUS_LOGON_FAILURE' in forceUnicode(error):
-					logger.warning("Can't connect to {0}: check your credentials".format(networkAddress))
+					logger.warning("Can't connect to {0}: check your credentials".format(self.networkAddress))
 				elif 'NT_STATUS_IO_TIMEOUT' in forceUnicode(error):
-					logger.warning("Can't connect to {0}: firewall on client seems active".format(networkAddress))
+					logger.warning("Can't connect to {0}: firewall on client seems active".format(self.networkAddress))
 
 				if trynum == 2:
-					raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (networkAddress, error))
+					raise Exception(u"Failed to execute command on host '%s': winexe error: %s" % (self.networkAddress, error))
 				logger.info(u"Winexe failure '%s', retrying" % error)
 				time.sleep(2)
 
-	def _finaliseInstallation(self, networkAddress):
+	def _finaliseInstallation(self):
 		if self.reboot or self.shutdown:
 			if self.reboot:
-				logger.notice(u"Rebooting machine '%s'" % networkAddress)
+				logger.notice(u"Rebooting machine '%s'" % self.networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
 			elif self.shutdown:
-				logger.notice(u"Shutting down machine '%s'" % networkAddress)
+				logger.notice(u"Shutting down machine '%s'" % self.networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
 
 			try:
 				pf = None
 				for const in ('%ProgramFiles(x86)%', '%ProgramFiles%'):
 					try:
-						lines = winexe(u'cmd.exe /C "echo %s"' % const, networkAddress, self.username, self.password)
+						lines = winexe(u'cmd.exe /C "echo %s"' % const, self.networkAddress, self.username, self.password)
 					except Exception as error:
 						logger.warning(error)
 						continue
@@ -446,7 +454,7 @@ class WindowsDeployThread(DeployThread):
 					raise Exception(u"Failed to get program files path")
 
 				logger.info(u"Program files path is '%s'" % pf)
-				winexe(cmd.replace(u'%ProgramFiles%', pf), networkAddress, self.username, self.password)
+				winexe(cmd.replace(u'%ProgramFiles%', pf), self.networkAddress, self.username, self.password)
 			except Exception as error:
 				if self.reboot:
 					logger.error(u"Failed to reboot computer: %s" % error)
@@ -454,9 +462,9 @@ class WindowsDeployThread(DeployThread):
 					logger.error(u"Failed to shutdown computer: %s" % error)
 		elif self.startService:
 			try:
-				winexe(u'net start opsiclientd', networkAddress, self.username, self.password)
+				winexe(u'net start opsiclientd', self.networkAddress, self.username, self.password)
 			except Exception as error:
-				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=networkAddress, error=error))
+				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=self.networkAddress, error=error))
 
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
@@ -478,8 +486,8 @@ class WindowsDeployThread(DeployThread):
 			self._createHostIfNotExisting(hostId, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
-			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
-			self._testWinexeConnection(networkAddress)
+			self._setNetworkAddress(hostId, hostName, ipAddress)
+			self._testWinexeConnection()
 
 			mountDir = os.path.join(u'/tmp', u'mnt_' + randomString(10))
 			os.makedirs(mountDir)
@@ -487,10 +495,10 @@ class WindowsDeployThread(DeployThread):
 			logger.notice(u"Mounting c$ share")
 			try:
 				try:
-					execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), networkAddress, mountDir), timeout=15)
+					execute(u"%s -t cifs -o'username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), self.networkAddress, mountDir), timeout=15)
 				except Exception as error:
 					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139" % error)
-					execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), networkAddress, mountDir), timeout=15)
+					execute(u"%s -t cifs -o'port=139,username=%s,password=%s' //%s/c$ %s" % (which('mount'), self.username, self.password.replace("'", "'\"'\"'"), self.networkAddress, mountDir), timeout=15)
 			except Exception as error:
 				raise Exception(u"Failed to mount c$ share: %s\nPerhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?" % error)
 
@@ -519,7 +527,7 @@ class WindowsDeployThread(DeployThread):
 			cmd = u'c:\\%s\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\%s\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY' % (instDirName, instDirName)
 			for trynum in (1, 2):
 				try:
-					winexe(cmd, networkAddress, self.username, self.password)
+					winexe(cmd, self.networkAddress, self.username, self.password)
 					break
 				except Exception as error:
 					if trynum == 2:
@@ -529,7 +537,7 @@ class WindowsDeployThread(DeployThread):
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation(networkAddress)
+			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
@@ -591,9 +599,8 @@ class LinuxDeployThread(DeployThread):
 			self._createHostIfNotExisting(hostId, ipAddress)
 			hostObj = self.backend.host_getObjects(type='OpsiClient', id=hostId)[0]
 
-			networkAddress = self._getNetworkAddress(hostId, hostName, ipAddress)
-
-			self._executeViaSSH(networkAddress, "echo 'it works'")
+			self._setNetworkAddress(hostId, hostName, ipAddress)
+			self._executeViaSSH("echo 'it works'")
 
 			localFolder = os.path.dirname(os.path.abspath(__file__))
 			logger.notice(u"Patching config.ini")
@@ -615,16 +622,15 @@ class LinuxDeployThread(DeployThread):
 			try:
 				logger.debug("Copying installation scripts...")
 				self._copyDirectoryOverSSH(
-					networkAddress,
 					os.path.join(localFolder, 'files'),
 					remoteFolder
 				)
 
 				logger.debug("Copying config for client...")
-				self._copyFileOverSSH(networkAddress, configIniPath, os.path.join(remoteFolder, 'files', 'opsi', 'cfg', 'config.ini'))
+				self._copyFileOverSSH(configIniPath, os.path.join(remoteFolder, 'files', 'opsi', 'cfg', 'config.ini'))
 
 				logger.debug("Checking architecture of client...")
-				(_, stdout, _) = self._executeViaSSH(networkAddress, 'uname -m')
+				(_, stdout, _) = self._executeViaSSH('uname -m')
 				if "64" not in ''.join(stdout.readlines()):
 					remoteArch = "32"
 				else:
@@ -632,18 +638,18 @@ class LinuxDeployThread(DeployThread):
 
 				# TODO: sudo not needed everywhere - try with and without
 				installCommand = "sudo /tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
-				self._executeViaSSH(networkAddress, installCommand)
+				self._executeViaSSH(installCommand)
 			finally:
 				os.remove(configIniPath)
 
 				try:
-					self._executeViaSSH(networkAddress, "rm -rf {tempfolder}".format(tempfolder=remoteFolder))
+					self._executeViaSSH("rm -rf {tempfolder}".format(tempfolder=remoteFolder))
 				except Exception as error:
 					logger.error(error)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
 			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation(networkAddress)
+			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
@@ -658,19 +664,19 @@ class LinuxDeployThread(DeployThread):
 				except Exception as error:
 					logger.debug2("Closing SSH connection failed: {0}".format(error))
 
-	def _executeViaSSH(self, networkAddress, command):
+	def _executeViaSSH(self, command):
 		"""
 		Executing a command via SSH.
 
 		Will return the filehandles for stdin, stdout, stderr in a tuple.
 		"""
-		self._connectViaSSH(networkAddress)
+		self._connectViaSSH()
 
 		logger.debug("Executing on remote: {0}".format(command))
 		(stdin, stdout, stderr) = self._sshConnection.exec_command(command)
 		return (stdin, stdout, stderr)
 
-	def _connectViaSSH(self, networkAddress):
+	def _connectViaSSH(self):
 		if self._sshConnection is not None:
 			return
 
@@ -680,19 +686,19 @@ class LinuxDeployThread(DeployThread):
 
 		logger.debug("Connecting via SSH...")
 		self._sshConnection.connect(
-			hostname=networkAddress,
+			hostname=self.networkAddress,
 			username=self.username,
 			password=self.password
 		)
 
-	def _copyFileOverSSH(self, networkAddress, localPath, remotePath):
-		self._connectViaSSH(networkAddress)
+	def _copyFileOverSSH(self, localPath, remotePath):
+		self._connectViaSSH()
 
 		ftpConnection = self._sshConnection.open_sftp()
 		ftpConnection.put(localPath, remotePath)
 		ftpConnection.close()
 
-	def _copyDirectoryOverSSH(self, networkAddress, localPath, remotePath):
+	def _copyDirectoryOverSSH(self, localPath, remotePath):
 		@contextmanager
 		def changeDirectory(path):
 			currentDir = os.getcwd()
@@ -706,7 +712,7 @@ class LinuxDeployThread(DeployThread):
 			except Exception as error:
 				logger.debug("Can't create {0} on remote: {1}".format(dirpath, error))
 
-		self._connectViaSSH(networkAddress)
+		self._connectViaSSH()
 
 		ftpConnection = self._sshConnection.open_sftp()
 		createFolderIfMissing(remotePath)
@@ -730,24 +736,24 @@ class LinuxDeployThread(DeployThread):
 
 			ftpConnection.close()
 
-	def _finaliseInstallation(self, networkAddress):
+	def _finaliseInstallation(self):
 		if self.reboot:
-			logger.notice(u"Rebooting machine '%s'" % networkAddress)
+			logger.notice(u"Rebooting machine '%s'" % self.networkAddress)
 			try:
-				self._executeViaSSH(networkAddress, "shutdown -r now")
+				self._executeViaSSH("shutdown -r now")
 			except Exception as error:
 				logger.error(u"Failed to reboot computer: %s" % error)
 		elif self.shutdown:
-			logger.notice(u"Shutting down machine '%s'" % networkAddress)
+			logger.notice(u"Shutting down machine '%s'" % self.networkAddress)
 			try:
-				self._executeViaSSH(networkAddress, "shutdown -h now")
+				self._executeViaSSH("shutdown -h now")
 			except Exception as error:
 				logger.error(u"Failed to shutdown computer: %s" % error)
 		elif self.startService:
 			try:
-				self._executeViaSSH(networkAddress, "service opsiclientd start || echo 'Already started.'")
+				self._executeViaSSH("service opsiclientd start || echo 'Already started.'")
 			except Exception as error:
-				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=networkAddress, error=error))
+				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=self.networkAddress, error=error))
 
 	def _installWithServersideMount(self):
 		raise NotImplementedError("Still working on server-side-mount.")
