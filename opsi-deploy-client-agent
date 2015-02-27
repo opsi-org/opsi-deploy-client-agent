@@ -765,6 +765,7 @@ def main(argv):
 		scriptDescription = '\n'.join((
 			scriptDescription,
 			u"The clients must be accessible via SSH.",
+			u"The user must be allowed to use sudo non-interactive.",
 		))
 	else:
 		scriptDescription = '\n'.join((
