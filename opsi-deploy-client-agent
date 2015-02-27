@@ -593,11 +593,12 @@ class LinuxDeployThread(DeployThread):
 
 			self._executeViaSSH(networkAddress, "echo 'it works'")
 
+			localFolder = os.path.dirname(os.path.abspath(__file__))
 			logger.notice(u"Patching config.ini")
 			configIniName = u'%s_config.ini' % randomString(10)
 			configIniPath = os.path.join('/tmp', configIniName)
-			copy(os.path.join(u'files', u'opsi', u'cfg', u'config.ini'), '/tmp/%s' % configIniName)
-			configFile = IniFile('/tmp/%s' % configIniName)
+			copy(os.path.join(localFolder, u'files', u'opsi', u'cfg', u'config.ini'), configIniPath)
+			configFile = IniFile(configIniPath)
 			config = configFile.parse()
 			if not config.has_section('shareinfo'):
 				config.add_section('shareinfo')
