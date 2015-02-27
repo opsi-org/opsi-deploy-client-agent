@@ -607,19 +607,21 @@ class LinuxDeployThread(DeployThread):
 				config.add_section('general')
 			config.set('general', 'dnsdomain', u'.'.join(hostObj.id.split('.')[1:]))
 			configFile.generate(config)
-
+			logger.debug("Generated config.")
 			remoteFolder = os.path.join('/tmp', 'opsi-linux-client-agent')
 
 			try:
+				logger.debug("Copying installation scripts...")
 				self._copyDirectoryOverSSH(
 					networkAddress,
-					os.path.join(os.path.dirname(__file__), 'files'),
+					os.path.join(localFolder, 'files'),
 					remoteFolder
 				)
 
-				# Patched config
+				logger.debug("Copying config for client...")
 				self._copyFileOverSSH(networkAddress, configIniPath, os.path.join(remoteFolder, 'files', 'opsi', 'cfg', 'config.ini'))
 
+				logger.debug("Checking architecture of client...")
 				(_, stdout, _) = self._executeViaSSH(networkAddress, 'uname -m')
 				if "64" not in ''.join(stdout.readlines()):
 					remoteArch = "32"
