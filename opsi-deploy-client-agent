@@ -86,7 +86,7 @@ class SkipClientException(Exception):
 
 class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
-				deploymentMethod="hostname", stopOnPingFailure=True,
+				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, clientSideMount=True,
 				keepClientOnFailure=False):
 
@@ -103,11 +103,29 @@ class DeployThread(threading.Thread):
 		self.clientSideMount = clientSideMount
 
 		deploymentMethod = forceUnicodeLower(deploymentMethod)
-		if deploymentMethod not in ("hostname", "ip", "fqdn"):
+		if deploymentMethod == "auto":
+			self._detectDeploymentMethod()
+		else:
+			self.deploymentMethod = deploymentMethod
+
+		if self.deploymentMethod not in ("hostname", "ip", "fqdn"):
 			raise ValueError("Invalid deployment method: {0}".format(deploymentMethod))
-		self.deploymentMethod = deploymentMethod
 
 		self.keepClientOnFailure = keepClientOnFailure
+
+	def _detectDeploymentMethod(self):
+		if '.' not in self.host:
+			logger.debug("No dots in host. Assuming hostname.")
+			self.deploymentMethod = "hostname"
+			return
+
+		try:
+			forceIPAddress(self.host)
+			logger.debug("Valid IP found.")
+			self.deploymentMethod = "ip"
+		except ValueError:
+			logger.debug("Not a valid IP. Assuming FQDN.")
+			self.deploymentMethod = "fqdn"
 
 	def run(self):
 		if self.clientSideMount:
@@ -517,10 +535,10 @@ def main(argv):
 	parser.add_argument('-p', dest="password", default=u"",
 						help=u"password for authentication")
 	group = parser.add_mutually_exclusive_group()
-	group.add_argument('-c', '--use-fqdn', dest="useNetbios",
-						action="store_false",
+	group.add_argument('-c', '--use-fqdn', dest="useFQDN",
+						action="store_true",
 						help=u"Use FQDN to connect to client.")
-	group.add_argument('--use-hostname', dest="useNetbios", default=False,
+	group.add_argument('--use-hostname', dest="useNetbios",
 						action="store_true",
 						help=u"Use hostname to connect to client. (Default)")
 	group.add_argument('--use-ip-address', dest="useIPAddress",
@@ -598,8 +616,10 @@ def main(argv):
 		deploymentMethod = "ip"
 	elif args.useNetbios:
 		deploymentMethod = "hostname"
-	else:
+	elif args.useFQDN:
 		deploymentMethod = "fqdn"
+	else:
+		deploymentMethod = "auto"
 
 	# Create BackendManager
 	backend = BackendManager(
