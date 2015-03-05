@@ -877,6 +877,12 @@ def main(argv):
 		if not password:
 			raise Exception("No password given.")
 
+	for character in (u'$', u'§'):
+		if char in password:
+			logger.warning(
+				u"Please be aware that special characters in passwords may result"
+				u"in incorrect behaviour."
+				)
 	logger.addConfidentialString(password)
 
 	maxThreads = forceInt(args.maxThreads)
