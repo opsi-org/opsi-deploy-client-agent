@@ -792,7 +792,7 @@ def main(argv):
 									help=u"Use FQDN to connect to client.")
 	networkAccessGroup.add_argument('--use-hostname', dest="useNetbios",
 									action="store_true",
-									help=u"Use hostname to connect to client. (Default)")
+									help=u"Use hostname to connect to client.")
 	networkAccessGroup.add_argument('--use-ip-address', dest="useIPAddress",
 									action='store_true',
 									help="Use IP address to connect to client.")
