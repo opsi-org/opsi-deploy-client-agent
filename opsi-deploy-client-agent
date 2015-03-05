@@ -948,7 +948,6 @@ def main(argv):
 
 if __name__ == "__main__":
 	logger.setConsoleLevel(LOG_WARNING)
-	logger.setLogFormat('[%L] %M')
 	logger.setConsoleColor(True)
 
 	try:
