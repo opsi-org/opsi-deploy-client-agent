@@ -741,8 +741,15 @@ class LinuxDeployThread(DeployThread):
 			except Exception as error:
 				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=self.networkAddress, error=error))
 
-	def _installWithServersideMount(self):
-		raise NotImplementedError("Still working on server-side-mount.")
+	def _setOpsiClientAgentToInstalled(self, hostId):
+		poc = ProductOnClient(
+			productType=u'LocalbootProduct',
+			clientId=hostId,
+			productId=u'opsi-linux-client-agent',
+			installationStatus=u'installed',
+			actionResult=u'successful'
+		)
+		self.backend.productOnClient_updateObjects([poc])
 
 
 def main(argv):
