@@ -766,23 +766,25 @@ def main(argv):
 			u"The clients must be accessible via SSH.",
 			u"The user must be allowed to use sudo non-interactive.",
 		))
+		defaultUser = u"root"
 	else:
 		scriptDescription = '\n'.join((
 			scriptDescription,
 			u"The c$ and admin$ must be accessible on every client.",
 			u"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
 		))
+		defaultUser = u"Administrator"
 
 	parser = argparse.ArgumentParser(description=scriptDescription)
 	parser.add_argument('--version', '-V', action='version', version=__version__)
 	parser.add_argument('--verbose', '-v',
 						dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
-	parser.add_argument('--username', '-u', dest="username", default=u"Administrator",
+	parser.add_argument('--username', '-u', dest="username", default=defaultUser,
 						help=(
-							u'username for authentication (default: Administrator).\n'
-							u"example for a domain account: -u \"<DOMAIN>\\\\<username>\""
-							)
+							u'username for authentication (default: {0}).\n'
+							u"Example for a domain account: -u \"<DOMAIN>\\\\<username>\""
+							).format(defaultUser)
 						)
 	parser.add_argument('--password', '-p', dest="password", default=u"",
 						help=u"password for authentication")
