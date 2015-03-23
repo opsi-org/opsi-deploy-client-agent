@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.2'
+__version__ = '4.0.6.3'
 
 
 logger = Logger()
@@ -880,7 +880,7 @@ def main(argv):
 			raise Exception("No password given.")
 
 	for character in (u'$', u'§'):
-		if char in password:
+		if character in password:
 			logger.warning(
 				u"Please be aware that special characters in passwords may result"
 				u"in incorrect behaviour."
