@@ -877,7 +877,8 @@ def main(argv):
 				try:
 					host, description = line.split(None, 1)
 					additionalHostInfos[host] = {"description": description}
-				except ValueError:
+				except ValueError as error:
+					logger.debug("Splitting line '{0}' failed: {1}".format(line, error))
 					host = line
 
 				hosts.append(forceUnicodeLower(host))
