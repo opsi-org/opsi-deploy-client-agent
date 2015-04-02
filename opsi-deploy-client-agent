@@ -825,7 +825,11 @@ def main(argv):
 										help=u"start opsiclientd service after installation")
 	parser.add_argument('--hosts-from-file', '-f',
 						dest="hostFile", default=None,
-						help=u"file containing list of clients (one hostname per line)")
+						help=(
+							u"File containing list of clients (one hostname "
+							u"per line). If there is a space followed by text "
+							u"after the hostname this will be used as client "
+							u"description for new clients."))
 	parser.add_argument('--skip-existing-clients', '-S',
 						dest="skipExistingClient", default=False,
 						action="store_true", help=u"skip known opsi clients")
