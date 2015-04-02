@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.3'
+__version__ = '4.0.6.4'
 
 
 logger = Logger()
@@ -95,7 +95,7 @@ class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, mountWithSmbclient=True,
-				keepClientOnFailure=False):
+				keepClientOnFailure=False, additionalClientSettings=None):
 
 		threading.Thread.__init__(self)
 		self.host = host
@@ -120,6 +120,8 @@ class DeployThread(threading.Thread):
 
 		self.keepClientOnFailure = keepClientOnFailure
 		self._networkAddress = None
+
+		self.additionalClientSettings = additionalClientSettings
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -227,15 +229,19 @@ class DeployThread(threading.Thread):
 			if not mac:
 				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
 
+			clientConfig = {
+				"id": hostId,
+				"hardwareAddress": mac,
+				"ipAddress": ipAddress,
+				"description": u"",
+				"notes": u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
+			}
+			if self.additionalClientSettings:
+				clientConfig.update(self.additionalClientSettings)
+				logger.debug("Updated config now is: {0}".format(clientConfig))
+
 			logger.notice(u"Creating client '%s'" % hostId)
-			hostObj = OpsiClient(
-				id=hostId,
-				hardwareAddress=mac,
-				ipAddress=ipAddress,
-				description=u"",
-				notes=u"Created by opsi-deploy-client-agent at %s" % time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime())
-			)
-			self.backend.host_createObjects([hostObj])
+			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
@@ -294,11 +300,12 @@ class WindowsDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 			deploymentMethod="hostname", stopOnPingFailure=True,
 			skipExistingClient=False, mountWithSmbclient=True,
-			keepClientOnFailure=False):
+			keepClientOnFailure=False, additionalClientSettings=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
-			skipExistingClient, mountWithSmbclient, keepClientOnFailure)
+			skipExistingClient, mountWithSmbclient, keepClientOnFailure,
+			additionalClientSettings)
 
 	def run(self):
 		if self.mountWithSmbclient:
@@ -564,11 +571,12 @@ class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
-		keepClientOnFailure=False):
+		keepClientOnFailure=False, additionalClientSettings=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
-		skipExistingClient, mountWithSmbclient, keepClientOnFailure)
+		skipExistingClient, mountWithSmbclient, keepClientOnFailure,
+		additionalClientSettings)
 
 		self._sshConnection = None
 
@@ -854,6 +862,7 @@ def main(argv):
 		logger.critical(message)
 		raise Exception(message)
 
+	additionalHostInfos = {}
 	hosts = args.host
 	if args.hostFile:
 		if not os.path.isfile(args.hostFile):
@@ -865,7 +874,14 @@ def main(argv):
 				if not line or line.startswith('#') or line.startswith(';'):
 					continue
 
-				hosts.append(forceUnicodeLower(line))
+				try:
+					host, description = line.split(None, 1)
+					additionalHostInfos[host] = {"description": description}
+				except ValueError as error:
+					logger.debug("Splitting line '{0}' failed: {1}".format(line, error))
+					host = line
+
+				hosts.append(forceUnicodeLower(host))
 
 	if not hosts:
 		raise Exception("No hosts given.")
@@ -933,18 +949,27 @@ def main(argv):
 
 		host = hosts.pop()
 
-		thread = deploymentClass(host, backend,
-			args.username,
-			password,
-			args.shutdown,
-			args.reboot,
-			args.startService,
-			deploymentMethod,
-			args.stopOnPingFailure,
-			args.skipExistingClient,
-			mountWithSmbclient,
-			args.keepClientOnFailure
-		)
+		clientConfig = {
+			"host": host,
+			"backend": backend,
+			"username": args.username,
+			"password": password,
+			"shutdown": args.shutdown,
+			"reboot": args.reboot,
+			"startService": args.startService,
+			"deploymentMethod": deploymentMethod,
+			"stopOnPingFailure": args.stopOnPingFailure,
+			"skipExistingClient": args.skipExistingClient,
+			"mountWithSmbclient": mountWithSmbclient,
+			"keepClientOnFailure": args.keepClientOnFailure
+		}
+
+		try:
+			clientConfig['additionalClientSettings'] = additionalHostInfos[host]
+		except KeyError:
+			pass
+
+		thread = deploymentClass(**clientConfig)
 
 		thread.start()
 		runningThreads.append(thread)
