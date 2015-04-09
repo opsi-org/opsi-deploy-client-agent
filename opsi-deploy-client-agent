@@ -632,7 +632,11 @@ class LinuxDeployThread(DeployThread):
 				if not remoteArch:
 					raise RuntimeError("Could not get architecture of client.")
 
-				installCommand = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
+				opsiscript = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui".format(arch=remoteArch)
+				logger.debug("Will use: {0}".format(opsiscript))
+				self._executeViaSSH("chmod +x {0}".format(opsiscript))
+
+				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
 				self._executeViaSSH(installCommand)
