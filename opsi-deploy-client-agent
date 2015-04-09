@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.5'
+__version__ = '4.0.6.6'
 
 
 logger = Logger()
@@ -632,7 +632,11 @@ class LinuxDeployThread(DeployThread):
 				if not remoteArch:
 					raise RuntimeError("Could not get architecture of client.")
 
-				installCommand = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
+				opsiscript = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui".format(arch=remoteArch)
+				logger.debug("Will use: {0}".format(opsiscript))
+				self._executeViaSSH("chmod +x {0}".format(opsiscript))
+
+				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
 				self._executeViaSSH(installCommand)
@@ -684,6 +688,9 @@ class LinuxDeployThread(DeployThread):
 			exitCode = channel.recv_exit_status()
 
 			if exitCode:
+				logger.debug("Command output: ")
+				for line in out:
+					logger.debug(line)
 				raise SSHRemoteExecutionException(
 					u"Executing '{0}' on remote client failed! "
 					u"Got exit code {1}".format(command, exitCode)
@@ -697,7 +704,7 @@ class LinuxDeployThread(DeployThread):
 	def _getTargetArchitecture(self):
 		logger.debug("Checking architecture of client...")
 		output = self._executeViaSSH('uname -m')
-		if "64" not in out.read():
+		if "64" not in output.read():
 			return "32"
 		else:
 			return "64"
@@ -736,7 +743,7 @@ class LinuxDeployThread(DeployThread):
 			try:
 				ftpConnection.mkdir(path)
 			except Exception as error:
-				logger.debug("Can't create {0} on remote: {1}".format(dirpath, error))
+				logger.debug("Can't create {0} on remote: {1}".format(path, error))
 
 		self._connectViaSSH()
 
