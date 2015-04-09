@@ -688,6 +688,9 @@ class LinuxDeployThread(DeployThread):
 			exitCode = channel.recv_exit_status()
 
 			if exitCode:
+				logger.debug("Command output: ")
+				for line in out:
+					logger.debug(line)
 				raise SSHRemoteExecutionException(
 					u"Executing '{0}' on remote client failed! "
 					u"Got exit code {1}".format(command, exitCode)
