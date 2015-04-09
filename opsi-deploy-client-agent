@@ -630,8 +630,9 @@ class LinuxDeployThread(DeployThread):
 				else:
 					remoteArch = "64"
 
-				# TODO: sudo not needed everywhere - try with and without
-				installCommand = "sudo /tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
+				installCommand = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(arch=remoteArch)
+				if self.username != 'root':
+					installCommand = "sudo {command}".format(installCommand)
 				self._executeViaSSH(installCommand)
 			finally:
 				os.remove(configIniPath)
