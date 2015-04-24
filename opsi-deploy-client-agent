@@ -640,6 +640,11 @@ class LinuxDeployThread(DeployThread):
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
 				self._executeViaSSH(installCommand)
+
+				logger.debug("Testing if folder was created...")
+				self._executeViaSSH("test -d /etc/opsi-client-agent/")
+				logger.debug("Testing if executable was found...")
+				self._executeViaSSH("which opsiclientd")
 			finally:
 				os.remove(configIniPath)
 
