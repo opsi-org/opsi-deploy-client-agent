@@ -644,7 +644,7 @@ class LinuxDeployThread(DeployThread):
 				logger.debug("Testing if folder was created...")
 				self._executeViaSSH("test -d /etc/opsi-client-agent/")
 				logger.debug("Testing if executable was found...")
-				self._executeViaSSH("which opsiclientd")
+				self._executeViaSSH("test -e /usr/bin/opsiclientd")
 			finally:
 				os.remove(configIniPath)
 
