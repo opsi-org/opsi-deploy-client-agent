@@ -970,7 +970,16 @@ def main(argv):
 		deploymentClass = WindowsDeployThread
 		mountWithSmbclient = args.mountWithSmbclient
 
-		if not mountWithSmbclient:
+		if mountWithSmbclient:
+			logger.debug('Explicit check for smbclient.')
+			try:
+				which('smbclient')
+			except Exception as error:
+				raise Exception(
+					"Please make sure that 'smbclient' is installed: "
+					"{0}".format(error)
+				)
+		else:
 			if os.getuid() != 0:
 				raise Exception("You have to be root to use mount.")
 	else:
