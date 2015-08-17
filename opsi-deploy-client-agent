@@ -974,6 +974,7 @@ def main(argv):
 			if os.getuid() != 0:
 				raise Exception("You have to be root to use mount.")
 	else:
+		logger.info("Deploying to Linux.")
 		deploymentClass = LinuxDeployThread
 		mountWithSmbclient = False
 
