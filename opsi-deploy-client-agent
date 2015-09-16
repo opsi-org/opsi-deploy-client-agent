@@ -646,11 +646,14 @@ class LinuxDeployThread(DeployThread):
 				logger.debug("Testing if executable was found...")
 				self._executeViaSSH("test -e /usr/bin/opsiclientd")
 			finally:
-				os.remove(configIniPath)
+				try:
+					os.remove(configIniPath)
+				except OSError as error:
+					logger.debug("Removing {0} failed: {1}".format(configIniPath, error))
 
 				try:
 					self._executeViaSSH("rm -rf {tempfolder}".format(tempfolder=remoteFolder))
-				except Exception as error:
+				except (Exception, paramiko.SSHException) as error:
 					logger.error(error)
 
 			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
