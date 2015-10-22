@@ -892,11 +892,20 @@ def main(argv):
 								action="store_false",
 								help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
 
-	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
-						default=False, action="store_true",
-						help=(u"If the client was created in opsi and "
-								u"anything fails after that the client is "
-								u"not removed."))
+	clientRemovalGroup = parser.add_mutually_exclusive_group()
+	clientRemovalGroup.add_argument('--keep-client-on-failure',
+									dest="keepClientOnFailure",
+									default=False, action="store_true",
+									help=(u"If the client was created in opsi "
+											u"through this script it will not "
+											u"be removed in case of failure."
+											u" (DEFAULT)"))
+	clientRemovalGroup.add_argument('--remove-client-on-failure',
+									dest="keepClientOnFailure",
+									action="store_false",
+									help=(u"If the client was created in opsi "
+											u"through this script it will be "
+											u"removed in case of failure."))
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
