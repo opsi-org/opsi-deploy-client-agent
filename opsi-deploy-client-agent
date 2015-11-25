@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.9'
+__version__ = '4.0.6.10'
 
 
 logger = Logger()
@@ -665,7 +665,10 @@ class LinuxDeployThread(DeployThread):
 			logger.notice(u"Skipping host '%s'" % hostId)
 			return
 		except (Exception, paramiko.SSHException) as error:
-			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
+			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			if 'Incompatible ssh peer (no acceptable kex algorithm)' in forceUnicode(error):
+				logger.error('Please install paramiko v1.15.1 or newer.')
+
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 
