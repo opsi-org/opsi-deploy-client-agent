@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.8'
+__version__ = '4.0.6.8-keep_client'
 
 
 logger = Logger()
@@ -123,6 +123,7 @@ class DeployThread(threading.Thread):
 			raise ValueError("Invalid deployment method: {0}".format(deploymentMethod))
 
 		self.keepClientOnFailure = keepClientOnFailure
+		self._clientCreatedByScript = None
 		self._networkAddress = None
 
 		self.additionalClientSettings = additionalClientSettings
@@ -246,6 +247,7 @@ class DeployThread(threading.Thread):
 
 			logger.notice(u"Creating client '%s'" % hostId)
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
+			self._clientCreatedByScript = True
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
@@ -377,7 +379,7 @@ class WindowsDeployThread(DeployThread):
 			return
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
-			if hostObj and not self.keepClientOnFailure:
+			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 
 	def _getHostId(self, host):
@@ -547,7 +549,7 @@ class WindowsDeployThread(DeployThread):
 			return
 		except Exception as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
-			if hostObj and not self.keepClientOnFailure:
+			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 		finally:
 			if instDir or mountDir:
@@ -664,7 +666,7 @@ class LinuxDeployThread(DeployThread):
 			return
 		except (Exception, paramiko.SSHException) as error:
 			logger.error(u"Deployment to '%s' failed: %s" % (self.host, error))
-			if hostObj and not self.keepClientOnFailure:
+			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 
 			if self._sshConnection is not None:
@@ -893,11 +895,20 @@ def main(argv):
 								action="store_false",
 								help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
 
-	parser.add_argument('--keep-client-on-failure', dest="keepClientOnFailure",
-						default=False, action="store_true",
-						help=(u"If the client was created in opsi and "
-								u"anything fails after that the client is "
-								u"not removed."))
+	clientRemovalGroup = parser.add_mutually_exclusive_group()
+	clientRemovalGroup.add_argument('--keep-client-on-failure',
+									dest="keepClientOnFailure",
+									default=False, action="store_true",
+									help=(u"If the client was created in opsi "
+											u"through this script it will not "
+											u"be removed in case of failure."
+											u" (DEFAULT)"))
+	clientRemovalGroup.add_argument('--remove-client-on-failure',
+									dest="keepClientOnFailure",
+									action="store_false",
+									help=(u"If the client was created in opsi "
+											u"through this script it will be "
+											u"removed in case of failure."))
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
