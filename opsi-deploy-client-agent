@@ -1017,7 +1017,7 @@ def main(argv):
 	)
 	runningThreads = []
 	while hosts:
-		while len(runningThreads) > maxThreads:
+		while len(runningThreads) >= maxThreads:
 			time.sleep(1)
 			for thread in runningThreads:
 				if thread.isAlive():
