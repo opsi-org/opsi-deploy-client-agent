@@ -45,7 +45,7 @@ import time
 from contextlib import contextmanager
 
 from OPSI.Backend.BackendManager import BackendManager
-from OPSI.Logger import Logger, LOG_WARNING, LOG_ERROR, LOG_NOTICE
+from OPSI.Logger import Logger, LOG_DEBUG, LOG_ERROR, LOG_NOTICE, LOG_WARNING
 from OPSI.Object import OpsiClient, ProductOnClient
 from OPSI.System import copy, execute, getFQDN, umount, which
 from OPSI.Types import forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower
@@ -840,6 +840,8 @@ def main(argv):
 	parser.add_argument('--verbose', '-v',
 						dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
+	parser.add_argument('--debug-file', dest='debugFile',
+						help='Write debug output to given file.')
 	parser.add_argument('--username', '-u', dest="username", default=defaultUser,
 						help=(
 							u'username for authentication (default: {0}).\n'
@@ -918,6 +920,10 @@ def main(argv):
 	args = parser.parse_args(argv)
 
 	logger.setConsoleLevel(args.logLevel)
+
+	if args.debugFile:
+		logger.setLogFile(args.debugFile)
+		logger.setFileLevel(LOG_DEBUG)
 
 	if deployLinux and paramiko is None:
 		message = (
