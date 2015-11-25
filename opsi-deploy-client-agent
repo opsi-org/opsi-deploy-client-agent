@@ -1066,6 +1066,4 @@ if __name__ == "__main__":
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(error)
 		print(u"ERROR: %s" % forceUnicode(error), file=sys.stderr)
-		sys.exit(1)
-
-	sys.exit(0)
+		raise error
