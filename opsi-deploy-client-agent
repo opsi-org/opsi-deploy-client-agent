@@ -930,9 +930,6 @@ def main(argv):
 	additionalHostInfos = {}
 	hosts = args.host
 	if args.hostFile:
-		if not os.path.isfile(args.hostFile):
-			raise Exception(u"File '%s' not found!" % args.hostFile)
-
 		with open(args.hostFile) as inputFile:
 			for line in inputFile:
 				line = line.strip()
