@@ -705,7 +705,7 @@ class LinuxDeployThread(DeployThread):
 				for line in out:
 					logger.debug(line)
 				raise SSHRemoteExecutionException(
-					u"Executing '{0}' on remote client failed! "
+					u"Executing {0!r} on remote client failed! "
 					u"Got exit code {1}".format(command, exitCode)
 				)
 
