@@ -700,6 +700,8 @@ class LinuxDeployThread(DeployThread):
 			out = channel.makefile("rb", -1)
 			exitCode = channel.recv_exit_status()
 
+			logger.debug("Exit code was: {0!r}".format(exitCode))
+
 			if exitCode:
 				logger.debug("Command output: ")
 				for line in out:
