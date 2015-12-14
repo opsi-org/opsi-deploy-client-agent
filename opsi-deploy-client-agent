@@ -150,6 +150,8 @@ class DeployThread(threading.Thread):
 				host = hostname
 			except socket.herror as error:
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
+                logger.info(u"Could not get a hostname for {0}. This is needed to create a FQDN for the client in opsi.")
+                logger.info(u"Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
 		host = host.replace('_', '-')
