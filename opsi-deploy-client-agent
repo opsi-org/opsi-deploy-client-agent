@@ -658,7 +658,7 @@ class LinuxDeployThread(DeployThread):
 				except (Exception, paramiko.SSHException) as error:
 					logger.error(error)
 
-			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			logger.notice(u"opsi-linux-client-agent successfully installed on {0!r}".format(hostId))
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
