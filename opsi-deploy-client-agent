@@ -42,7 +42,7 @@ import sys
 import threading
 import time
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 
 from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_DEBUG, LOG_ERROR, LOG_NOTICE, LOG_WARNING
@@ -689,9 +689,7 @@ class LinuxDeployThread(DeployThread):
 
 		logger.debug("Executing on remote: {0}".format(command))
 
-		channel = None
-		try:
-			channel = self._sshConnection.get_transport().open_session()
+		with closing(self._sshConnection.get_transport().open_session()) as channel:
 			channel.set_combine_stderr(True)
 			channel.settimeout(None)  # blocking until completion of command
 
@@ -710,9 +708,6 @@ class LinuxDeployThread(DeployThread):
 				)
 
 			return out
-		finally:
-			if channel:
-				channel.close()
 
 	def _getTargetArchitecture(self):
 		logger.debug("Checking architecture of client...")
@@ -740,9 +735,8 @@ class LinuxDeployThread(DeployThread):
 	def _copyFileOverSSH(self, localPath, remotePath):
 		self._connectViaSSH()
 
-		ftpConnection = self._sshConnection.open_sftp()
-		ftpConnection.put(localPath, remotePath)
-		ftpConnection.close()
+		with closing(self._sshConnection.open_sftp()) as ftpConnection:
+			ftpConnection.put(localPath, remotePath)
 
 	def _copyDirectoryOverSSH(self, localPath, remotePath):
 		@contextmanager
@@ -760,27 +754,25 @@ class LinuxDeployThread(DeployThread):
 
 		self._connectViaSSH()
 
-		ftpConnection = self._sshConnection.open_sftp()
-		createFolderIfMissing(remotePath)
+		with closing(self._sshConnection.open_sftp()) as ftpConnection:
+			createFolderIfMissing(remotePath)
 
-		if not os.path.exists(localPath):
-			raise ValueError("Can't find local path '{0}'".format(localPath))
+			if not os.path.exists(localPath):
+				raise ValueError("Can't find local path '{0}'".format(localPath))
 
-		# The following stunt is necessary to get results in 'dirpath'
-		# that can be easily used for folder creation on the remote.
-		with changeDirectory(os.path.join(localPath, '..')):
-			directoryToWalk = os.path.basename(localPath)
-			for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
-				createFolderIfMissing(os.path.join(remotePath, dirpath))
+			# The following stunt is necessary to get results in 'dirpath'
+			# that can be easily used for folder creation on the remote.
+			with changeDirectory(os.path.join(localPath, '..')):
+				directoryToWalk = os.path.basename(localPath)
+				for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
+					createFolderIfMissing(os.path.join(remotePath, dirpath))
 
-				for filename in filenames:
-					local = os.path.join(dirpath, filename)
-					remote = os.path.join(remotePath, dirpath, filename)
+					for filename in filenames:
+						local = os.path.join(dirpath, filename)
+						remote = os.path.join(remotePath, dirpath, filename)
 
-					logger.debug2("Copying {0} -> {1}".format(local, remote))
-					ftpConnection.put(local, remote)
-
-			ftpConnection.close()
+						logger.debug2("Copying {0} -> {1}".format(local, remote))
+						ftpConnection.put(local, remote)
 
 	def _finaliseInstallation(self):
 		if self.reboot:
