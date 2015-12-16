@@ -620,7 +620,7 @@ class LinuxDeployThread(DeployThread):
 			remoteFolder = os.path.join('/tmp', 'opsi-linux-client-agent')
 
 			try:
-				logger.debug("Copying installation scripts...")
+				logger.notice("Copying installation scripts...")
 				self._copyDirectoryOverSSH(
 					os.path.join(localFolder, 'files'),
 					remoteFolder
