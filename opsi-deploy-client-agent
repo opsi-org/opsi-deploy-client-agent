@@ -641,6 +641,7 @@ class LinuxDeployThread(DeployThread):
 				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
+				logger.notice('Running installation script...')
 				self._executeViaSSH(installCommand)
 
 				logger.debug("Testing if folder was created...")
