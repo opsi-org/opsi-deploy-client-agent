@@ -84,6 +84,11 @@ def winexe(cmd, host, username, password):
 		logger.info('Getting winexe installed on system failed ({0}) Using local.'.format(error))
 		executable = './winexe'
 
+	try:
+		logger.info('Winexe Version: {0}'.format(''.join(execute('{winexe} -V'.format(winexe=executable)))))
+	except Exception as versionError:
+		logger.warning(u"Failed to get version: {0}".format(versionError))
+
 	return execute(u"%s -U '%s' //%s '%s'" % (executable, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
 
 
