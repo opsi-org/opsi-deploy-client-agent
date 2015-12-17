@@ -627,7 +627,7 @@ class LinuxDeployThread(DeployThread):
 			remoteFolder = os.path.join('/tmp', 'opsi-linux-client-agent')
 
 			try:
-				logger.debug("Copying installation scripts...")
+				logger.notice("Copying installation scripts...")
 				self._copyDirectoryOverSSH(
 					os.path.join(localFolder, 'files'),
 					remoteFolder
@@ -648,6 +648,7 @@ class LinuxDeployThread(DeployThread):
 				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
+				logger.notice('Running installation script...')
 				self._executeViaSSH(installCommand)
 
 				logger.debug("Testing if folder was created...")
@@ -665,7 +666,7 @@ class LinuxDeployThread(DeployThread):
 				except (Exception, paramiko.SSHException) as error:
 					logger.error(error)
 
-			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			logger.notice(u"opsi-linux-client-agent successfully installed on {0!r}".format(hostId))
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
@@ -704,6 +705,8 @@ class LinuxDeployThread(DeployThread):
 
 			out = channel.makefile("rb", -1)
 			exitCode = channel.recv_exit_status()
+
+			logger.debug("Exit code was: {0!r}".format(exitCode))
 
 			if exitCode:
 				logger.debug("Command output: ")
