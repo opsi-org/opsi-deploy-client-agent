@@ -42,7 +42,7 @@ import sys
 import threading
 import time
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 
 from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_DEBUG, LOG_ERROR, LOG_NOTICE, LOG_WARNING
@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.11'
+__version__ = '4.0.6.12'
 
 
 logger = Logger()
@@ -83,6 +83,11 @@ def winexe(cmd, host, username, password):
 	except Exception as error:
 		logger.info('Getting winexe installed on system failed ({0}) Using local.'.format(error))
 		executable = './winexe'
+
+	try:
+		logger.info('Winexe Version: {0}'.format(''.join(execute('{winexe} -V'.format(winexe=executable)))))
+	except Exception as versionError:
+		logger.warning(u"Failed to get version: {0}".format(versionError))
 
 	return execute(u"%s -U '%s' //%s '%s'" % (executable, username + '%' + password.replace("'", "'\"'\"'"), host, cmd))
 
@@ -150,6 +155,8 @@ class DeployThread(threading.Thread):
 				host = hostname
 			except socket.herror as error:
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
+				logger.info(u"Could not get a hostname for {0}. This is needed to create a FQDN for the client in opsi.")
+				logger.info(u"Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
 		host = host.replace('_', '-')
@@ -620,7 +627,7 @@ class LinuxDeployThread(DeployThread):
 			remoteFolder = os.path.join('/tmp', 'opsi-linux-client-agent')
 
 			try:
-				logger.debug("Copying installation scripts...")
+				logger.notice("Copying installation scripts...")
 				self._copyDirectoryOverSSH(
 					os.path.join(localFolder, 'files'),
 					remoteFolder
@@ -641,6 +648,7 @@ class LinuxDeployThread(DeployThread):
 				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(installCommand)
+				logger.notice('Running installation script...')
 				self._executeViaSSH(installCommand)
 
 				logger.debug("Testing if folder was created...")
@@ -658,7 +666,7 @@ class LinuxDeployThread(DeployThread):
 				except (Exception, paramiko.SSHException) as error:
 					logger.error(error)
 
-			logger.notice(u"opsi-client-agent successfully installed on '%s'" % hostId)
+			logger.notice(u"opsi-linux-client-agent successfully installed on {0!r}".format(hostId))
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
@@ -689,9 +697,7 @@ class LinuxDeployThread(DeployThread):
 
 		logger.debug("Executing on remote: {0}".format(command))
 
-		channel = None
-		try:
-			channel = self._sshConnection.get_transport().open_session()
+		with closing(self._sshConnection.get_transport().open_session()) as channel:
 			channel.set_combine_stderr(True)
 			channel.settimeout(None)  # blocking until completion of command
 
@@ -700,19 +706,18 @@ class LinuxDeployThread(DeployThread):
 			out = channel.makefile("rb", -1)
 			exitCode = channel.recv_exit_status()
 
+			logger.debug("Exit code was: {0!r}".format(exitCode))
+
 			if exitCode:
 				logger.debug("Command output: ")
 				for line in out:
 					logger.debug(line)
 				raise SSHRemoteExecutionException(
-					u"Executing '{0}' on remote client failed! "
+					u"Executing {0!r} on remote client failed! "
 					u"Got exit code {1}".format(command, exitCode)
 				)
 
 			return out
-		finally:
-			if channel:
-				channel.close()
 
 	def _getTargetArchitecture(self):
 		logger.debug("Checking architecture of client...")
@@ -740,9 +745,8 @@ class LinuxDeployThread(DeployThread):
 	def _copyFileOverSSH(self, localPath, remotePath):
 		self._connectViaSSH()
 
-		ftpConnection = self._sshConnection.open_sftp()
-		ftpConnection.put(localPath, remotePath)
-		ftpConnection.close()
+		with closing(self._sshConnection.open_sftp()) as ftpConnection:
+			ftpConnection.put(localPath, remotePath)
 
 	def _copyDirectoryOverSSH(self, localPath, remotePath):
 		@contextmanager
@@ -760,27 +764,25 @@ class LinuxDeployThread(DeployThread):
 
 		self._connectViaSSH()
 
-		ftpConnection = self._sshConnection.open_sftp()
-		createFolderIfMissing(remotePath)
+		with closing(self._sshConnection.open_sftp()) as ftpConnection:
+			createFolderIfMissing(remotePath)
 
-		if not os.path.exists(localPath):
-			raise ValueError("Can't find local path '{0}'".format(localPath))
+			if not os.path.exists(localPath):
+				raise ValueError("Can't find local path '{0}'".format(localPath))
 
-		# The following stunt is necessary to get results in 'dirpath'
-		# that can be easily used for folder creation on the remote.
-		with changeDirectory(os.path.join(localPath, '..')):
-			directoryToWalk = os.path.basename(localPath)
-			for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
-				createFolderIfMissing(os.path.join(remotePath, dirpath))
+			# The following stunt is necessary to get results in 'dirpath'
+			# that can be easily used for folder creation on the remote.
+			with changeDirectory(os.path.join(localPath, '..')):
+				directoryToWalk = os.path.basename(localPath)
+				for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
+					createFolderIfMissing(os.path.join(remotePath, dirpath))
 
-				for filename in filenames:
-					local = os.path.join(dirpath, filename)
-					remote = os.path.join(remotePath, dirpath, filename)
+					for filename in filenames:
+						local = os.path.join(dirpath, filename)
+						remote = os.path.join(remotePath, dirpath, filename)
 
-					logger.debug2("Copying {0} -> {1}".format(local, remote))
-					ftpConnection.put(local, remote)
-
-			ftpConnection.close()
+						logger.debug2("Copying {0} -> {1}".format(local, remote))
+						ftpConnection.put(local, remote)
 
 	def _finaliseInstallation(self):
 		if self.reboot:
