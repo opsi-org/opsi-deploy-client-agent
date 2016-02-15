@@ -786,17 +786,17 @@ class LinuxDeployThread(DeployThread):
 
 	def _finaliseInstallation(self):
 		if self.reboot:
-			logger.notice(u"Rebooting machine '%s'" % self.networkAddress)
+			logger.notice(u"Rebooting machine {0!r}".format(self.networkAddress))
 			try:
 				self._executeViaSSH("shutdown -r 1 & disown")
 			except Exception as error:
 				logger.error(u"Failed to reboot computer: %s" % error)
 		elif self.shutdown:
-			logger.notice(u"Shutting down machine '%s'" % self.networkAddress)
+			logger.notice(u"Shutting down machine {0!r}".format(self.networkAddress))
 			try:
 				self._executeViaSSH("shutdown -h 1 & disown")
 			except Exception as error:
-				logger.error(u"Failed to shutdown computer: %s" % error)
+				logger.error(u"Failed to shutdown computer: {0}".format(error))
 		elif self.startService:
 			try:
 				self._executeViaSSH("service opsiclientd start || echo 'Already started.'")
