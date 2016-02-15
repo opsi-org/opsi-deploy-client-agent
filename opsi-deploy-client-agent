@@ -788,13 +788,13 @@ class LinuxDeployThread(DeployThread):
 		if self.reboot:
 			logger.notice(u"Rebooting machine '%s'" % self.networkAddress)
 			try:
-				self._executeViaSSH("shutdown -r now")
+				self._executeViaSSH("shutdown -r 1 & disown")
 			except Exception as error:
 				logger.error(u"Failed to reboot computer: %s" % error)
 		elif self.shutdown:
 			logger.notice(u"Shutting down machine '%s'" % self.networkAddress)
 			try:
-				self._executeViaSSH("shutdown -h now")
+				self._executeViaSSH("shutdown -h 1 & disown")
 			except Exception as error:
 				logger.error(u"Failed to shutdown computer: %s" % error)
 		elif self.startService:
