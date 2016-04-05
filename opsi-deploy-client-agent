@@ -184,6 +184,10 @@ class DeployThread(threading.Thread):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 			raise SkipClientException("Client {0} exists.".format(hostId))
 
+		if self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=hostId):
+			logger.warning("Tried to deploy to existing opsi server {0!r}. Skipping!".format(hostId))
+			raise SkipClientException("Not deploying to server {0}.".format(hostId))
+
 	def _prepareDeploymentToHost(self, hostId):
 		hostName = hostId.split('.')[0]
 		ipAddress = self._getIpAddress(hostId, hostName)
