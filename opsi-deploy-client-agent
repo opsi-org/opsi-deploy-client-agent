@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2015 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2016 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.13'
+__version__ = '4.0.6.14'
 
 
 logger = Logger()
@@ -183,6 +183,10 @@ class DeployThread(threading.Thread):
 	def _checkIfClientShouldBeSkipped(self, hostId):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:
 			raise SkipClientException("Client {0} exists.".format(hostId))
+
+		if self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=hostId):
+			logger.warning("Tried to deploy to existing opsi server {0!r}. Skipping!".format(hostId))
+			raise SkipClientException("Not deploying to server {0}.".format(hostId))
 
 	def _prepareDeploymentToHost(self, hostId):
 		hostName = hostId.split('.')[0]
