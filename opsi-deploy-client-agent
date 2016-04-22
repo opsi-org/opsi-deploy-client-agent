@@ -961,7 +961,8 @@ def main(argv):
 	if deployLinux and paramiko is None:
 		message = (
 			u"Could not import 'paramiko'. "
-			u"Deploying to Linux not possible."
+			u"Deploying to Linux not possible. "
+			u"Please install paramiko through your package manager or pip."
 		)
 		logger.critical(message)
 		raise Exception(message)
