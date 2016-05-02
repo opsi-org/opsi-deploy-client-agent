@@ -684,8 +684,10 @@ class LinuxDeployThread(DeployThread):
 
 				logger.debug("Testing if folder was created...")
 				self._executeViaSSH("test -d /etc/opsi-client-agent/")
+				logger.debug("Testing if config can be found...")
+				self._executeViaSSH("test -e /etc/opsi-client-agent/opsiclientd.conf")
 				logger.debug("Testing if executable was found...")
-				self._executeViaSSH("test -e /usr/bin/opsiclientd")
+				self._executeViaSSH("test -e /usr/bin/opsiclientd -o -e /usr/bin/opsi-script-nogui")
 			finally:
 				try:
 					os.remove(configIniPath)
@@ -805,7 +807,7 @@ class LinuxDeployThread(DeployThread):
 			# that can be easily used for folder creation on the remote.
 			with changeDirectory(os.path.join(localPath, '..')):
 				directoryToWalk = os.path.basename(localPath)
-				for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
+				for dirpath, _, filenames in os.walk(directoryToWalk):
 					createFolderIfMissing(os.path.join(remotePath, dirpath))
 
 					for filename in filenames:
@@ -961,7 +963,8 @@ def main(argv):
 	if deployLinux and paramiko is None:
 		message = (
 			u"Could not import 'paramiko'. "
-			u"Deploying to Linux not possible."
+			u"Deploying to Linux not possible. "
+			u"Please install paramiko through your package manager or pip."
 		)
 		logger.critical(message)
 		raise Exception(message)
@@ -1001,7 +1004,7 @@ def main(argv):
 			logger.warning(
 				u"Please be aware that special characters in passwords may result"
 				u"in incorrect behaviour."
-				)
+			)
 			break
 	logger.addConfidentialString(password)
 
