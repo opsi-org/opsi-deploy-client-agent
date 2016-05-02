@@ -807,7 +807,7 @@ class LinuxDeployThread(DeployThread):
 			# that can be easily used for folder creation on the remote.
 			with changeDirectory(os.path.join(localPath, '..')):
 				directoryToWalk = os.path.basename(localPath)
-				for (dirpath, dirnames, filenames) in os.walk(directoryToWalk):
+				for dirpath, _, filenames in os.walk(directoryToWalk):
 					createFolderIfMissing(os.path.join(remotePath, dirpath))
 
 					for filename in filenames:
