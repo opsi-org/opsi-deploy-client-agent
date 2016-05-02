@@ -1003,7 +1003,7 @@ def main(argv):
 			logger.warning(
 				u"Please be aware that special characters in passwords may result"
 				u"in incorrect behaviour."
-				)
+			)
 			break
 	logger.addConfidentialString(password)
 
