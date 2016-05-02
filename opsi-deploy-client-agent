@@ -687,7 +687,7 @@ class LinuxDeployThread(DeployThread):
 				logger.debug("Testing if config can be found...")
 				self._executeViaSSH("test -e /etc/opsi-client-agent/opsiclientd.conf")
 				logger.debug("Testing if executable was found...")
-				self._executeViaSSH("test -e /usr/bin/opsiclientd")
+				self._executeViaSSH("test -e /usr/bin/opsiclientd -o -e /usr/bin/opsi-script-nogui")
 			finally:
 				try:
 					os.remove(configIniPath)
