@@ -169,8 +169,18 @@ class DeployThread(threading.Thread):
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
+			hostBefore = host
 			try:
 				host = socket.getfqdn(socket.gethostbyname(host))
+
+				try:
+					if ip == forceIPAddress(host):  # Lookup did not succeed
+						# Falling back to hopefully valid hostname
+						host = hostBefore
+				except ValueError:
+					pass  # no IP - great!
+				except NameError:
+					pass  # no deployment via IP
 			except socket.gaierror as error:
 				logger.debug("Lookup of {0} failed.".format(host))
 
@@ -431,8 +441,18 @@ class WindowsDeployThread(DeployThread):
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
+			hostBefore = host
 			try:
 				host = socket.getfqdn(socket.gethostbyname(host))
+
+				try:
+					if ip == forceIPAddress(host):  # Lookup did not succeed
+						# Falling back to hopefully valid hostname
+						host = hostBefore
+				except ValueError:
+					pass  # no IP - great!
+				except NameError:
+					pass  # no deployment via IP
 			except socket.gaierror as error:
 				logger.debug("Lookup of {0} failed.".format(host))
 
