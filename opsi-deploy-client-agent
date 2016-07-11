@@ -62,7 +62,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.6.15'
+__version__ = '4.0.7.1'
 
 
 logger = Logger()
@@ -164,14 +164,27 @@ class DeployThread(threading.Thread):
 				logger.info(u"Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
+			logger.debug(u"Lookup of IP returned hostname {0!r}".format(host))
+
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
+			hostBefore = host
 			try:
 				host = socket.getfqdn(socket.gethostbyname(host))
+
+				try:
+					if ip == forceIPAddress(host):  # Lookup did not succeed
+						# Falling back to hopefully valid hostname
+						host = hostBefore
+				except ValueError:
+					pass  # no IP - great!
+				except NameError:
+					pass  # no deployment via IP
 			except socket.gaierror as error:
 				logger.debug("Lookup of {0} failed.".format(host))
 
+		logger.debug(u"Host is now: {0!r}".format(host))
 		if host.count(u'.') < 2:
 			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
@@ -423,14 +436,27 @@ class WindowsDeployThread(DeployThread):
 					logger.debug("Name lookup via winexe failed: {0}".format(error))
 					raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
 
+			logger.debug(u"Lookup of IP returned hostname {0!r}".format(host))
+
 		host = host.replace('_', '-')
 
 		if host.count(u'.') < 2:
+			hostBefore = host
 			try:
 				host = socket.getfqdn(socket.gethostbyname(host))
+
+				try:
+					if ip == forceIPAddress(host):  # Lookup did not succeed
+						# Falling back to hopefully valid hostname
+						host = hostBefore
+				except ValueError:
+					pass  # no IP - great!
+				except NameError:
+					pass  # no deployment via IP
 			except socket.gaierror as error:
 				logger.debug("Lookup of {0} failed.".format(host))
 
+		logger.debug(u"Host is now: {0!r}".format(host))
 		if host.count(u'.') < 2:
 			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
