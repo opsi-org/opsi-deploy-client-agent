@@ -108,7 +108,8 @@ class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, mountWithSmbclient=True,
-				keepClientOnFailure=False, additionalClientSettings=None):
+				keepClientOnFailure=False, additionalClientSettings=None,
+				group=None):
 
 		threading.Thread.__init__(self)
 		self.host = host
@@ -136,6 +137,7 @@ class DeployThread(threading.Thread):
 		self._networkAddress = None
 
 		self.additionalClientSettings = additionalClientSettings
+		self.targetGroup = group
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -278,6 +280,27 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Creating client {0!r}".format(hostId))
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
+			self._putClientIntoGroup(hostId)
+
+	def _putClientIntoGroup(self, clientId):
+		groupId = self.targetGroup
+		if not groupId:
+			return
+
+		if not self.backend.group_getObjects(id=groupId):
+			logger.warning(u"Target group {0} does not exist. Not assigning client.".format(groupId))
+			return
+
+		mapping = {
+			"groupType": "HostGroup",
+			"groupId": groupId,
+			"objectId": clientId,
+		}
+		try:
+			self.backend.objectToGroup_createObjects([mapping])
+			logger.info(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
+		except Exception as creationError:
+			logger.warning(u"Adding {client!r} to group {group!r} failed: {error}".format(client=clientId, group=groupId, error=creationError))
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
@@ -336,12 +359,13 @@ class WindowsDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 			deploymentMethod="hostname", stopOnPingFailure=True,
 			skipExistingClient=False, mountWithSmbclient=True,
-			keepClientOnFailure=False, additionalClientSettings=None):
+			keepClientOnFailure=False, additionalClientSettings=None,
+			group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
 			skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-			additionalClientSettings)
+			additionalClientSettings, group)
 
 	def run(self):
 		if self.mountWithSmbclient:
@@ -640,12 +664,13 @@ class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
-		keepClientOnFailure=False, additionalClientSettings=None):
+		keepClientOnFailure=False, additionalClientSettings=None,
+		group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-		additionalClientSettings)
+		additionalClientSettings, group)
 
 		self._sshConnection = None
 
@@ -974,6 +999,8 @@ def main(argv):
 									help=(u"If the client was created in opsi "
 											u"through this script it will be "
 											u"removed in case of failure."))
+	parser.add_argument('--group', dest="group",
+						help="Assign fresh clients to an already existing group.")
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
@@ -1100,7 +1127,8 @@ def main(argv):
 			"stopOnPingFailure": args.stopOnPingFailure,
 			"skipExistingClient": args.skipExistingClient,
 			"mountWithSmbclient": mountWithSmbclient,
-			"keepClientOnFailure": args.keepClientOnFailure
+			"keepClientOnFailure": args.keepClientOnFailure,
+			"group": args.group,
 		}
 
 		try:
