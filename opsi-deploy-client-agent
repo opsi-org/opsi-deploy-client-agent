@@ -21,7 +21,7 @@
 opsi-deploy-client-agent
 
 This script can be used to deploy the opsi-client-agent to systems
-that are already running a Windows Operating System that has not been
+that are already running an Operating System that has not been
 installed via opsi.
 
 
