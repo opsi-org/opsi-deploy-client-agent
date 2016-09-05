@@ -964,7 +964,7 @@ def main(argv):
 	clientRemovalGroup = parser.add_mutually_exclusive_group()
 	clientRemovalGroup.add_argument('--keep-client-on-failure',
 									dest="keepClientOnFailure",
-									default=False, action="store_true",
+									default=True, action="store_true",
 									help=(u"If the client was created in opsi "
 											u"through this script it will not "
 											u"be removed in case of failure."
