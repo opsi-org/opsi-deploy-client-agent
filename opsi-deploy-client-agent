@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.7.1'
+__version__ = '4.0.7.2'
 
 
 logger = Logger()
@@ -940,10 +940,10 @@ def main(argv):
 	parser.add_argument('--hosts-from-file', '-f',
 						dest="hostFile", default=None,
 						help=(
-							u"File containing list of clients (one hostname "
-							u"per line). If there is a space followed by text "
-							u"after the hostname this will be used as client "
-							u"description for new clients."))
+							u"File containing addresses of hosts (one per line)."
+							u"If there is a space followed by text after the "
+							u"address this will be used as client description "
+							u"for new clients."))
 	parser.add_argument('--skip-existing-clients', '-S',
 						dest="skipExistingClient", default=False,
 						action="store_true", help=u"skip known opsi clients")
@@ -963,7 +963,7 @@ def main(argv):
 	clientRemovalGroup = parser.add_mutually_exclusive_group()
 	clientRemovalGroup.add_argument('--keep-client-on-failure',
 									dest="keepClientOnFailure",
-									default=False, action="store_true",
+									default=True, action="store_true",
 									help=(u"If the client was created in opsi "
 											u"through this script it will not "
 											u"be removed in case of failure."
