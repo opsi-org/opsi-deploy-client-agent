@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.7.2'
+__version__ = '4.0.7.3'
 
 
 logger = Logger()
@@ -159,7 +159,7 @@ class DeployThread(threading.Thread):
 				host = hostname
 			except socket.herror as error:
 				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
-				logger.info(u"Could not get a hostname for {0}. This is needed to create a FQDN for the client in opsi.")
+				logger.warning(u"Could not get a hostname for {0}. This is needed to create a FQDN for the client in opsi.".format(ip))
 				logger.info(u"Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
@@ -429,6 +429,9 @@ class WindowsDeployThread(DeployThread):
 					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
 					for line in output:
 						if line.strip():
+							if 'ignoring unknown parameter' in line.lower() or 'unknown parameter encountered' in line.lower():
+								continue
+
 							host = line.strip()
 							break
 				except Exception as error:
