@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.7.2'
+__version__ = '4.0.7.3'
 
 
 logger = Logger()
