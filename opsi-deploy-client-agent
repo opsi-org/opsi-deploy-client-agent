@@ -429,6 +429,9 @@ class WindowsDeployThread(DeployThread):
 					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
 					for line in output:
 						if line.strip():
+							if 'ignoring unknown parameter' in line.lower() or 'unknown parameter encountered' in line.lower():
+								continue
+
 							host = line.strip()
 							break
 				except Exception as error:
