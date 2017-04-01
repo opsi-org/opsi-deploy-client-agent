@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2016 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2017 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -285,10 +285,6 @@ class DeployThread(threading.Thread):
 	def _putClientIntoGroup(self, clientId):
 		groupId = self.targetGroup
 		if not groupId:
-			return
-
-		if not self.backend.group_getObjects(id=groupId):
-			logger.warning(u"Target group {0} does not exist. Not assigning client.".format(groupId))
 			return
 
 		mapping = {
@@ -1103,6 +1099,10 @@ def main(argv):
 		depotbackend=False,
 		hostControlBackend=False
 	)
+
+	if args.group and not backend.group_getObjects(id=args.group):
+		raise ValueError(u"Target group {0} does not exist.".format(args.group))
+
 	runningThreads = []
 	while hosts:
 		while len(runningThreads) >= maxThreads:
