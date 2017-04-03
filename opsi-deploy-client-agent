@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2016 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2017 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -108,7 +108,8 @@ class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, mountWithSmbclient=True,
-				keepClientOnFailure=False, additionalClientSettings=None):
+				keepClientOnFailure=False, additionalClientSettings=None,
+				depot=None, group=None):
 
 		threading.Thread.__init__(self)
 		self.host = host
@@ -136,6 +137,8 @@ class DeployThread(threading.Thread):
 		self._networkAddress = None
 
 		self.additionalClientSettings = additionalClientSettings
+		self.depot = depot
+		self.group = group
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -278,6 +281,42 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Creating client {0!r}".format(hostId))
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
+			self._putClientIntoGroup(hostId)
+			self._assignClientToDepot(hostId)
+
+	def _putClientIntoGroup(self, clientId):
+		groupId = self.group
+		if not groupId:
+			return
+
+		mapping = {
+			"type": "ObjectToGroup",
+			"groupType": "HostGroup",
+			"groupId": groupId,
+			"objectId": clientId,
+		}
+		try:
+			self.backend.objectToGroup_createObjects([mapping])
+			logger.notice(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
+		except Exception as creationError:
+			logger.warning(u"Adding {client!r} to group {group!r} failed: {error}".format(client=clientId, group=groupId, error=creationError))
+
+	def _assignClientToDepot(self, clientId):
+		depot = self.depot
+		if not depot:
+			return
+
+		depotAssignment = {
+			"configId": "clientconfig.depot.id",
+			"values": [depot],
+			"objectId": clientId,
+			"type": "ConfigState",
+		}
+		try:
+			self.backend.configState_createObjects([depotAssignment])
+			logger.notice(u"Assigned {client!r} to depot {depot!r}".format(client=clientId, depot=depot))
+		except Exception as assignmentError:
+			logger.warning(u"Assgining {client!r} to depot {depot!r} failed: {error}".format(client=clientId, depot=depot, error=assignmentError))
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
@@ -336,12 +375,13 @@ class WindowsDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 			deploymentMethod="hostname", stopOnPingFailure=True,
 			skipExistingClient=False, mountWithSmbclient=True,
-			keepClientOnFailure=False, additionalClientSettings=None):
+			keepClientOnFailure=False, additionalClientSettings=None,
+			depot=None, group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
 			skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-			additionalClientSettings)
+			additionalClientSettings, depot, group)
 
 	def run(self):
 		if self.mountWithSmbclient:
@@ -643,12 +683,13 @@ class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
-		keepClientOnFailure=False, additionalClientSettings=None):
+		keepClientOnFailure=False, additionalClientSettings=None,
+		depot=None, group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-		additionalClientSettings)
+		additionalClientSettings, depot, group)
 
 		self._sshConnection = None
 
@@ -953,6 +994,9 @@ def main(argv):
 	parser.add_argument('--threads', '-t', dest="maxThreads", default=1,
 						type=int,
 						help=u"number of concurrent deployment threads")
+	parser.add_argument('--depot', help="Assign new clients to the given depot.")
+	parser.add_argument('--group', dest="group",
+						help="Assign fresh clients to an already existing group.")
 
 	if not deployLinux:
 		mountGroup = parser.add_mutually_exclusive_group()
@@ -1079,6 +1123,14 @@ def main(argv):
 		depotbackend=False,
 		hostControlBackend=False
 	)
+
+	if args.depot:
+		assert backend.config_getObjects(id='clientconfig.depot.id')
+		if not backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=args.depot):
+			raise ValueError("No depot with id {0!r} found!".format(args.depot))
+	if args.group and not backend.group_getObjects(id=args.group):
+		raise ValueError(u"Group {0} does not exist.".format(args.group))
+
 	runningThreads = []
 	while hosts:
 		while len(runningThreads) >= maxThreads:
@@ -1103,7 +1155,9 @@ def main(argv):
 			"stopOnPingFailure": args.stopOnPingFailure,
 			"skipExistingClient": args.skipExistingClient,
 			"mountWithSmbclient": mountWithSmbclient,
-			"keepClientOnFailure": args.keepClientOnFailure
+			"keepClientOnFailure": args.keepClientOnFailure,
+			"depot": args.depot,
+			"group": args.group,
 		}
 
 		try:
