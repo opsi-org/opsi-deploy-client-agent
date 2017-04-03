@@ -1129,7 +1129,7 @@ def main(argv):
 		if not backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=args.depot):
 			raise ValueError("No depot with id {0!r} found!".format(args.depot))
 	if args.group and not backend.group_getObjects(id=args.group):
-		raise ValueError(u"Target group {0} does not exist.".format(args.group))
+		raise ValueError(u"Group {0} does not exist.".format(args.group))
 
 	runningThreads = []
 	while hosts:
