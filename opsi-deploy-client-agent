@@ -985,6 +985,8 @@ def main(argv):
 						type=int,
 						help=u"number of concurrent deployment threads")
 	parser.add_argument('--depot', help="Assign new clients to the given depot.")
+	parser.add_argument('--group', dest="group",
+						help="Assign fresh clients to an already existing group.")
 
 	if not deployLinux:
 		mountGroup = parser.add_mutually_exclusive_group()
@@ -1009,8 +1011,6 @@ def main(argv):
 									help=(u"If the client was created in opsi "
 											u"through this script it will be "
 											u"removed in case of failure."))
-	parser.add_argument('--group', dest="group",
-						help="Assign fresh clients to an already existing group.")
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
