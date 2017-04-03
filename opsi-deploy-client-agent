@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2016 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2017 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -109,7 +109,7 @@ class DeployThread(threading.Thread):
 				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, mountWithSmbclient=True,
 				keepClientOnFailure=False, additionalClientSettings=None,
-				depot=None):
+				depot=None, group=None):
 
 		threading.Thread.__init__(self)
 		self.host = host
@@ -138,6 +138,7 @@ class DeployThread(threading.Thread):
 
 		self.additionalClientSettings = additionalClientSettings
 		self.depot = depot
+		self.group = group
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -280,6 +281,23 @@ class DeployThread(threading.Thread):
 			logger.notice(u"Creating client {0!r}".format(hostId))
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
+			self._putClientIntoGroup(hostId)
+
+	def _putClientIntoGroup(self, clientId):
+		groupId = self.group
+		if not groupId:
+			return
+
+		mapping = {
+			"groupType": "HostGroup",
+			"groupId": groupId,
+			"objectId": clientId,
+		}
+		try:
+			self.backend.objectToGroup_createObjects([mapping])
+			logger.info(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
+		except Exception as creationError:
+			logger.warning(u"Adding {client!r} to group {group!r} failed: {error}".format(client=clientId, group=groupId, error=creationError))
 
 			if self.depot:
 				depotAssignment = {
@@ -348,12 +366,12 @@ class WindowsDeployThread(DeployThread):
 			deploymentMethod="hostname", stopOnPingFailure=True,
 			skipExistingClient=False, mountWithSmbclient=True,
 			keepClientOnFailure=False, additionalClientSettings=None,
-			depot=None):
+			depot=None, group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
 			skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-			additionalClientSettings, depot)
+			additionalClientSettings, depot, group)
 
 	def run(self):
 		if self.mountWithSmbclient:
@@ -656,12 +674,12 @@ class LinuxDeployThread(DeployThread):
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False, additionalClientSettings=None,
-		depot=None):
+		depot=None, group=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-		additionalClientSettings, depot)
+		additionalClientSettings, depot, group)
 
 		self._sshConnection = None
 
@@ -991,6 +1009,8 @@ def main(argv):
 									help=(u"If the client was created in opsi "
 											u"through this script it will be "
 											u"removed in case of failure."))
+	parser.add_argument('--group', dest="group",
+						help="Assign fresh clients to an already existing group.")
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
@@ -1098,6 +1118,8 @@ def main(argv):
 		assert backend.config_getObjects(id='clientconfig.depot.id')
 		if not self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=hostId):
 			raise ValueError("No depot with id {0!r} found!".format(args.depot))
+	if args.group and not backend.group_getObjects(id=args.group):
+		raise ValueError(u"Target group {0} does not exist.".format(args.group))
 
 	runningThreads = []
 	while hosts:
@@ -1125,6 +1147,7 @@ def main(argv):
 			"mountWithSmbclient": mountWithSmbclient,
 			"keepClientOnFailure": args.keepClientOnFailure,
 			"depot": args.depot,
+			"group": args.group,
 		}
 
 		try:
