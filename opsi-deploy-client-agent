@@ -108,7 +108,8 @@ class DeployThread(threading.Thread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 				deploymentMethod="auto", stopOnPingFailure=True,
 				skipExistingClient=False, mountWithSmbclient=True,
-				keepClientOnFailure=False, additionalClientSettings=None):
+				keepClientOnFailure=False, additionalClientSettings=None,
+				depot=None):
 
 		threading.Thread.__init__(self)
 		self.host = host
@@ -136,6 +137,7 @@ class DeployThread(threading.Thread):
 		self._networkAddress = None
 
 		self.additionalClientSettings = additionalClientSettings
+		self.depot = depot
 
 	def _detectDeploymentMethod(self):
 		if '.' not in self.host:
@@ -279,6 +281,15 @@ class DeployThread(threading.Thread):
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
 
+			if self.depot:
+				depotAssignment = {
+					"configId": "clientconfig.depot.id",
+					"values": [self.depot],
+					"objectId": hostId,
+					"type": "ConfigState"
+				}
+				self.backend.configState_insertObject(depotAssignment)
+
 	@staticmethod
 	def _getMacAddress(ipAddress):
 		mac = u''
@@ -336,12 +347,13 @@ class WindowsDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 			deploymentMethod="hostname", stopOnPingFailure=True,
 			skipExistingClient=False, mountWithSmbclient=True,
-			keepClientOnFailure=False, additionalClientSettings=None):
+			keepClientOnFailure=False, additionalClientSettings=None,
+			depot=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 			reboot, startService, deploymentMethod, stopOnPingFailure,
 			skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-			additionalClientSettings)
+			additionalClientSettings, depot)
 
 	def run(self):
 		if self.mountWithSmbclient:
@@ -643,12 +655,13 @@ class LinuxDeployThread(DeployThread):
 	def __init__(self, host, backend, username, password, shutdown, reboot, startService,
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
-		keepClientOnFailure=False, additionalClientSettings=None):
+		keepClientOnFailure=False, additionalClientSettings=None,
+		depot=None):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
 		skipExistingClient, mountWithSmbclient, keepClientOnFailure,
-		additionalClientSettings)
+		additionalClientSettings, depot)
 
 		self._sshConnection = None
 
@@ -953,6 +966,7 @@ def main(argv):
 	parser.add_argument('--threads', '-t', dest="maxThreads", default=1,
 						type=int,
 						help=u"number of concurrent deployment threads")
+	parser.add_argument('--depot', help="Assign new clients to the given depot.")
 
 	if not deployLinux:
 		mountGroup = parser.add_mutually_exclusive_group()
@@ -1079,6 +1093,12 @@ def main(argv):
 		depotbackend=False,
 		hostControlBackend=False
 	)
+
+	if args.depot:
+		assert backend.config_getObjects(id='clientconfig.depot.id')
+		if not self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=hostId):
+			raise ValueError("No depot with id {0!r} found!".format(args.depot))
+
 	runningThreads = []
 	while hosts:
 		while len(runningThreads) >= maxThreads:
@@ -1103,7 +1123,8 @@ def main(argv):
 			"stopOnPingFailure": args.stopOnPingFailure,
 			"skipExistingClient": args.skipExistingClient,
 			"mountWithSmbclient": mountWithSmbclient,
-			"keepClientOnFailure": args.keepClientOnFailure
+			"keepClientOnFailure": args.keepClientOnFailure,
+			"depot": args.depot,
 		}
 
 		try:
