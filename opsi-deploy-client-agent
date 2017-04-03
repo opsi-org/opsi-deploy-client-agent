@@ -282,6 +282,7 @@ class DeployThread(threading.Thread):
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
 			self._putClientIntoGroup(hostId)
+			self._assignClientToDepot(hostId)
 
 	def _putClientIntoGroup(self, clientId):
 		groupId = self.group
@@ -289,24 +290,33 @@ class DeployThread(threading.Thread):
 			return
 
 		mapping = {
+			"type": "ObjectToGroup",
 			"groupType": "HostGroup",
 			"groupId": groupId,
 			"objectId": clientId,
 		}
 		try:
 			self.backend.objectToGroup_createObjects([mapping])
-			logger.info(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
+			logger.notice(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
 		except Exception as creationError:
 			logger.warning(u"Adding {client!r} to group {group!r} failed: {error}".format(client=clientId, group=groupId, error=creationError))
 
-			if self.depot:
-				depotAssignment = {
-					"configId": "clientconfig.depot.id",
-					"values": [self.depot],
-					"objectId": hostId,
-					"type": "ConfigState"
-				}
-				self.backend.configState_insertObject(depotAssignment)
+	def _assignClientToDepot(self, clientId):
+		depot = self.depot
+		if not depot:
+			return
+
+		depotAssignment = {
+			"configId": "clientconfig.depot.id",
+			"values": [depot],
+			"objectId": clientId,
+			"type": "ConfigState",
+		}
+		try:
+			self.backend.configState_createObjects([depotAssignment])
+			logger.notice(u"Assigned {client!r} to depot {depot!r}".format(client=clientId, depot=depot))
+		except Exception as assignmentError:
+			logger.warning(u"Assgining {client!r} to depot {depot!r} failed: {error}".format(client=clientId, depot=depot, error=assignmentError))
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
