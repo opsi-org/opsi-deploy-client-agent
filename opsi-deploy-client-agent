@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.7.4'
+__version__ = '4.0.7.5'
 
 
 logger = Logger()
@@ -745,7 +745,7 @@ class LinuxDeployThread(DeployThread):
 				logger.debug("Will use: {0}".format(opsiscript))
 				self._executeViaSSH("chmod +x {0}".format(opsiscript))
 
-				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER INSTALL:NOREBOOT".format(opsiscript)
+				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER REMOTEDEPLOY".format(opsiscript)
 				if self.username != 'root':
 					installCommand = "sudo {command}".format(command=installCommand)
 				logger.notice('Running installation script...')
