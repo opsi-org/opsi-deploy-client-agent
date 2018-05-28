@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.0.7.5'
+__version__ = '4.1.0.0'
 
 
 logger = Logger()
@@ -417,7 +417,7 @@ class WindowsDeployThread(DeployThread):
 
 			try:
 				logger.notice(u"Copying installation files")
-				cmd = u"{smbclient} //{address}/c$ -U '{credentials}' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put {config} config.ini; exit;'".format(
+				cmd = u"{smbclient} -m SMB3 //{address}/c$ -U '{credentials}' -c 'prompt; recurse; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put {config} config.ini; exit;'".format(
 					smbclient=which('smbclient'),
 					address=self.networkAddress,
 					credentials=self.username + '%' + self.password.replace("'", "'\"'\"'"),
