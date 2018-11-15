@@ -991,9 +991,13 @@ def main(argv):
 										action="store_true",
 										help=u"shutdown computer after installation")
 	postInstallationAction.add_argument('--start-opsiclientd', '-o',
-										dest="startService", default=False,
+										dest="startService", default=True,
 										action="store_true",
-										help=u"start opsiclientd service after installation")
+										help=u"Start opsiclientd service after installation (default).")
+	postInstallationAction.add_argument('--no-start-opsiclientd',
+										dest="startService",
+										action="store_false",
+										help=u"Do not start opsiclientd service after installation.")
 	parser.add_argument('--hosts-from-file', '-f',
 						dest="hostFile", default=None,
 						help=(
