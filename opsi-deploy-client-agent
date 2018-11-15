@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2017 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2018 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.1.0.0'
+__version__ = '4.1.0.1'
 
 
 logger = Logger()
@@ -684,7 +684,7 @@ class LinuxDeployThread(DeployThread):
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False, additionalClientSettings=None,
-		depot=None, group=None):
+		depot=None, group=None, sshPolicy=paramiko.WarningPolicy):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
@@ -692,6 +692,7 @@ class LinuxDeployThread(DeployThread):
 		additionalClientSettings, depot, group)
 
 		self._sshConnection = None
+		self._sshPolicy = sshPolicy
 
 	def run(self):
 		self._installWithSSH()
@@ -835,7 +836,7 @@ class LinuxDeployThread(DeployThread):
 
 		self._sshConnection = paramiko.SSHClient()
 		self._sshConnection.load_system_host_keys()
-		self._sshConnection.set_missing_host_key_policy(paramiko.WarningPolicy())
+		self._sshConnection.set_missing_host_key_policy(self._sshPolicy())
 
 		logger.debug("Connecting via SSH...")
 		self._sshConnection.connect(
@@ -968,6 +969,18 @@ def main(argv):
 						dest="stopOnPingFailure", default=True,
 						action="store_false",
 						help=u"try installation even if ping fails")
+	if deployLinux:
+		sshPolicyGroup = parser.add_mutually_exclusive_group()
+		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
+									const=paramiko.AutoAddPolicy, action="store_const",
+									help=u"Automatically add unknown SSH hostkeys.")
+		sshPolicyGroup.add_argument('--ssh-hostkey-reject', dest="sshHostkeyPolicy",
+									const=paramiko.RejectPolicy, action="store_const",
+									help=u"Reject unknown SSH hostkeys.")
+		sshPolicyGroup.add_argument('--ssh-hostkey-warn', dest="sshHostkeyPolicy",
+									const=paramiko.WarningPolicy, action="store_const",
+									help=u"Warn when encountering unknown SSH hostkeys. (Default)")
+
 	postInstallationAction = parser.add_mutually_exclusive_group()
 	postInstallationAction.add_argument('--reboot', '-r',
 										dest="reboot", default=False,
@@ -978,9 +991,13 @@ def main(argv):
 										action="store_true",
 										help=u"shutdown computer after installation")
 	postInstallationAction.add_argument('--start-opsiclientd', '-o',
-										dest="startService", default=False,
+										dest="startService", default=True,
 										action="store_true",
-										help=u"start opsiclientd service after installation")
+										help=u"Start opsiclientd service after installation (default).")
+	postInstallationAction.add_argument('--no-start-opsiclientd',
+										dest="startService",
+										action="store_false",
+										help=u"Do not start opsiclientd service after installation.")
 	parser.add_argument('--hosts-from-file', '-f',
 						dest="hostFile", default=None,
 						help=(
@@ -1164,6 +1181,9 @@ def main(argv):
 			clientConfig['additionalClientSettings'] = additionalHostInfos[host]
 		except KeyError:
 			pass
+
+		if deployLinux:
+			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or paramiko.WarningPolicy
 
 		thread = deploymentClass(**clientConfig)
 
