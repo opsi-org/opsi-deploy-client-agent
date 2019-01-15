@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.1.0.1'
+__version__ = '4.1.0.1-sudoedition'
 
 
 logger = Logger()
