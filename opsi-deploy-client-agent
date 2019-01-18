@@ -750,6 +750,8 @@ class LinuxDeployThread(DeployThread):
 				nonrootExecution = self.username != 'root'
 				if nonrootExecution:
 					credentialsfile = os.path.join(remoteFolder, '.credentials')
+					self._executeViaSSH("touch {credfile}".format(credfile=credentialsfile))
+					self._executeViaSSH("chmod 600 {credfile}".format(credfile=credentialsfile))
 					self._executeViaSSH("echo '{password}' > {credfile}".format(password=self.password, credfile=credentialsfile))
 					self._executeViaSSH('echo "\n" >> {credfile}'.format(password=self.password, credfile=credentialsfile))
 					installCommand = "sudo --stdin -- {command} < {credfile}".format(command=installCommand, credfile=credentialsfile)
