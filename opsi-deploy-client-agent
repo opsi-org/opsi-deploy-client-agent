@@ -3,7 +3,7 @@
 
 # This tool is part of the desktop management solution opsi
 # (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2018 uib GmbH <info@uib.de>
+# Copyright (C) 2007-2019 uib GmbH <info@uib.de>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.1.0.1'
+__version__ = '4.1.0.2'
 
 
 logger = Logger()
@@ -747,10 +747,21 @@ class LinuxDeployThread(DeployThread):
 				self._executeViaSSH("chmod +x {0}".format(opsiscript))
 
 				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER REMOTEDEPLOY".format(opsiscript)
-				if self.username != 'root':
-					installCommand = "sudo {command}".format(command=installCommand)
-				logger.notice('Running installation script...')
-				self._executeViaSSH(installCommand)
+				nonrootExecution = self.username != 'root'
+				if nonrootExecution:
+					credentialsfile = os.path.join(remoteFolder, '.credentials')
+					self._executeViaSSH("echo '{password}' > {credfile}".format(password=self.password, credfile=credentialsfile))
+					self._executeViaSSH('echo "\n" >> {credfile}'.format(password=self.password, credfile=credentialsfile))
+					installCommand = "sudo --stdin -- {command} < {credfile}".format(command=installCommand, credfile=credentialsfile)
+
+				try:
+					logger.notice('Running installation script...')
+					self._executeViaSSH(installCommand)
+				except Exception:
+					if nonrootExecution:
+						self._executeViaSSH("rm -f {credfile}".format(credfile=credentialsfile))
+
+					raise
 
 				logger.debug("Testing if folder was created...")
 				self._executeViaSSH("test -d /etc/opsi-client-agent/")
