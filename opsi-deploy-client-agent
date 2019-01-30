@@ -61,7 +61,7 @@ try:
 except ImportError:
 	paramiko = None
 
-__version__ = '4.1.0.3'
+__version__ = '4.1.0.4'
 
 
 logger = Logger()
@@ -80,8 +80,11 @@ def winexe(cmd, host, username, password):
 	try:
 		executable = which('winexe')
 	except Exception as error:
-		logger.info('Getting winexe installed on system failed ({0}) Using local.'.format(error))
-		executable = './winexe'
+		logger.critical(
+			"Unable to find 'winexe'. Please install 'opsi-windows-support' "
+			"through your operating systems package manager!"
+		)
+		raise RuntimeError("Missing 'winexe'")
 
 	try:
 		logger.info('Winexe Version: {0}'.format(''.join(execute('{winexe} -V'.format(winexe=executable)))))
