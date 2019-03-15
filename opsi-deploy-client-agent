@@ -1241,7 +1241,7 @@ def main(argv):
 	if fails:
 		logger.notice("{}/{} deployments failed", fails, total)
 
-	if success != total:
+	if fails:
 		return 1
 	else:
 		return 0
