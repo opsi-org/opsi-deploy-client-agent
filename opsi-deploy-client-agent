@@ -58,8 +58,14 @@ except ImportError:
 
 try:
 	import paramiko
+	AUTO_ADD_POLICY = paramiko.AutoAddPolicy
+	WARNING_POLICY = paramiko.WarningPolicy
+	REJECT_POLICY = paramiko.RejectPolicy
 except ImportError:
 	paramiko = None
+	AUTO_ADD_POLICY = None
+	WARNING_POLICY = None
+	REJECT_POLICY = None
 
 __version__ = '4.1.0.4'
 
@@ -687,7 +693,7 @@ class LinuxDeployThread(DeployThread):
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False, additionalClientSettings=None,
-		depot=None, group=None, sshPolicy=paramiko.WarningPolicy):
+		depot=None, group=None, sshPolicy=WARNING_POLICY):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
@@ -988,13 +994,13 @@ def main(argv):
 	if deployLinux:
 		sshPolicyGroup = parser.add_mutually_exclusive_group()
 		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
-									const=paramiko.AutoAddPolicy, action="store_const",
+									const=AUTO_ADD_POLICY, action="store_const",
 									help=u"Automatically add unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-reject', dest="sshHostkeyPolicy",
-									const=paramiko.RejectPolicy, action="store_const",
+									const=REJECT_POLICY, action="store_const",
 									help=u"Reject unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-warn', dest="sshHostkeyPolicy",
-									const=paramiko.WarningPolicy, action="store_const",
+									const=WARNING_POLICY, action="store_const",
 									help=u"Warn when encountering unknown SSH hostkeys. (Default)")
 
 	postInstallationAction = parser.add_mutually_exclusive_group()
@@ -1199,7 +1205,7 @@ def main(argv):
 			pass
 
 		if deployLinux:
-			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or paramiko.WarningPolicy
+			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or WARNING_POLICY
 
 		thread = deploymentClass(**clientConfig)
 
