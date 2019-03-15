@@ -32,6 +32,7 @@ installed via opsi.
 
 from __future__ import print_function
 
+import argparse
 import getpass
 import os
 import re
@@ -50,11 +51,6 @@ from OPSI.System import copy, execute, getFQDN, umount, which
 from OPSI.Types import forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower
 from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
-
-try:
-	import argparse
-except ImportError:
-	from OPSI.Util import argparse
 
 try:
 	import paramiko
