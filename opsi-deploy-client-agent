@@ -83,7 +83,7 @@ def winexe(cmd, host, username, password):
 
 	try:
 		executable = which('winexe')
-	except Exception as error:
+	except Exception:
 		logger.critical(
 			"Unable to find 'winexe'. Please install 'opsi-windows-support' "
 			"through your operating systems package manager!"
