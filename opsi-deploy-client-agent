@@ -1237,9 +1237,9 @@ def main(argv):
 
 	logger.notice("{}/{} deployments successfully", success, total)
 	if skips:
-		logger.notice("{}/{} deployments skipped", success, total)
+		logger.notice("{}/{} deployments skipped", skips, total)
 	if fails:
-		logger.notice("{}/{} deployments failed", success, total)
+		logger.notice("{}/{} deployments failed", fails, total)
 
 	if success != total:
 		return 1
