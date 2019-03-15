@@ -32,6 +32,7 @@ installed via opsi.
 
 from __future__ import print_function
 
+import argparse
 import getpass
 import os
 import re
@@ -52,16 +53,19 @@ from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
 
 try:
-	import argparse
-except ImportError:
-	from OPSI.Util import argparse
-
-try:
 	import paramiko
+	AUTO_ADD_POLICY = paramiko.AutoAddPolicy
+	WARNING_POLICY = paramiko.WarningPolicy
+	REJECT_POLICY = paramiko.RejectPolicy
 except ImportError:
 	paramiko = None
+	AUTO_ADD_POLICY = None
+	WARNING_POLICY = None
+	REJECT_POLICY = None
 
-__version__ = '4.1.0.4'
+__version__ = '4.1.0.5'
+
+SKIP_MARKER = 'clientskipped'
 
 
 logger = Logger()
@@ -79,7 +83,7 @@ def winexe(cmd, host, username, password):
 
 	try:
 		executable = which('winexe')
-	except Exception as error:
+	except Exception:
 		logger.critical(
 			"Unable to find 'winexe'. Please install 'opsi-windows-support' "
 			"through your operating systems package manager!"
@@ -115,6 +119,9 @@ class DeployThread(threading.Thread):
 				depot=None, group=None):
 
 		threading.Thread.__init__(self)
+
+		self.success = False
+
 		self.host = host
 		self.backend = backend
 		self.username = username
@@ -449,13 +456,16 @@ class WindowsDeployThread(DeployThread):
 					logger.error(error)
 
 			logger.notice(u"opsi-client-agent successfully installed on {0!r}".format(hostId))
+			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host {0!r}".format(hostId))
+			self.success = SKIP_MARKER
 			return
 		except Exception as error:
 			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			self.success = False
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 
@@ -651,12 +661,15 @@ class WindowsDeployThread(DeployThread):
 					time.sleep(2)
 
 			logger.notice(u"opsi-client-agent successfully installed on {0!r}".format(hostId))
+			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host {0!r}".format(hostId))
+			self.success = SKIP_MARKER
 			return
 		except Exception as error:
+			self.success = False
 			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
@@ -687,7 +700,7 @@ class LinuxDeployThread(DeployThread):
 		deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False, additionalClientSettings=None,
-		depot=None, group=None, sshPolicy=paramiko.WarningPolicy):
+		depot=None, group=None, sshPolicy=WARNING_POLICY):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
 		reboot, startService, deploymentMethod, stopOnPingFailure,
@@ -786,13 +799,16 @@ class LinuxDeployThread(DeployThread):
 					logger.error(error)
 
 			logger.notice(u"opsi-linux-client-agent successfully installed on {0!r}".format(hostId))
+			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
 			logger.notice(u"Skipping host {0!r}".format(hostId))
+			self.success = SKIP_MARKER
 			return
 		except (Exception, paramiko.SSHException) as error:
 			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			self.success = False
 			if 'Incompatible ssh peer (no acceptable kex algorithm)' in forceUnicode(error):
 				logger.error('Please install paramiko v1.15.1 or newer.')
 
@@ -988,13 +1004,13 @@ def main(argv):
 	if deployLinux:
 		sshPolicyGroup = parser.add_mutually_exclusive_group()
 		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
-									const=paramiko.AutoAddPolicy, action="store_const",
+									const=AUTO_ADD_POLICY, action="store_const",
 									help=u"Automatically add unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-reject', dest="sshHostkeyPolicy",
-									const=paramiko.RejectPolicy, action="store_const",
+									const=REJECT_POLICY, action="store_const",
 									help=u"Reject unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-warn', dest="sshHostkeyPolicy",
-									const=paramiko.WarningPolicy, action="store_const",
+									const=WARNING_POLICY, action="store_const",
 									help=u"Warn when encountering unknown SSH hostkeys. (Default)")
 
 	postInstallationAction = parser.add_mutually_exclusive_group()
@@ -1199,7 +1215,7 @@ def main(argv):
 			pass
 
 		if deployLinux:
-			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or paramiko.WarningPolicy
+			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or WARNING_POLICY
 
 		thread = deploymentClass(**clientConfig)
 
@@ -1207,10 +1223,30 @@ def main(argv):
 		runningThreads.append(thread)
 		time.sleep(0.5)
 
+	fails = 0
+	skips = 0
 	for thread in runningThreads:
 		if thread.isAlive():
 			thread.join()
 
+		if thread.success == SKIP_MARKER:
+			skips += 1
+		elif not thread.success:
+			fails += 1
+
+	total = len(runningThreads)
+	success = total - fails - skips
+
+	logger.notice("{}/{} deployments successfully", success, total)
+	if skips:
+		logger.notice("{}/{} deployments skipped", skips, total)
+	if fails:
+		logger.warning("{}/{} deployments failed", fails, total)
+
+	if fails:
+		return 1
+	else:
+		return 0
 
 if __name__ == "__main__":
 	logger.setConsoleLevel(LOG_WARNING)
@@ -1218,9 +1254,11 @@ if __name__ == "__main__":
 
 	try:
 		os.chdir(os.path.dirname(os.path.abspath(__file__)))
-		main(sys.argv[1:])
+		exitCode = main(sys.argv[1:])
 	except Exception as error:
 		logger.setConsoleLevel(LOG_ERROR)
 		logger.logException(error)
 		print(u"ERROR: {0}".format(forceUnicode(error)), file=sys.stderr)
 		raise error
+
+	sys.exit(exitCode)
