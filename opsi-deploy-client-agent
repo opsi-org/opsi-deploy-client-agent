@@ -1239,7 +1239,7 @@ def main(argv):
 	if skips:
 		logger.notice("{}/{} deployments skipped", skips, total)
 	if fails:
-		logger.notice("{}/{} deployments failed", fails, total)
+		logger.warning("{}/{} deployments failed", fails, total)
 
 	if fails:
 		return 1
