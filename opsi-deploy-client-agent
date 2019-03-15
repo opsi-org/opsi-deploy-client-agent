@@ -63,7 +63,7 @@ except ImportError:
 	WARNING_POLICY = None
 	REJECT_POLICY = None
 
-__version__ = '4.1.0.4'
+__version__ = '4.1.0.5'
 
 SKIP_MARKER = 'clientskipped'
 
