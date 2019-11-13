@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # This tool is part of the desktop management solution opsi
@@ -48,7 +48,8 @@ from OPSI.Backend.BackendManager import BackendManager
 from OPSI.Logger import Logger, LOG_DEBUG, LOG_ERROR, LOG_NOTICE, LOG_WARNING
 from OPSI.Object import OpsiClient, ProductOnClient
 from OPSI.System import copy, execute, getFQDN, umount, which
-from OPSI.Types import forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower
+from OPSI.Types import (
+	forceHostId, forceInt, forceIPAddress, forceUnicode, forceUnicodeLower)
 from OPSI.Util import randomString
 from OPSI.Util.File import IniFile
 
@@ -63,7 +64,7 @@ except ImportError:
 	WARNING_POLICY = None
 	REJECT_POLICY = None
 
-__version__ = '4.1.0.5'
+__version__ = '4.2.0.1'
 
 SKIP_MARKER = 'clientskipped'
 
