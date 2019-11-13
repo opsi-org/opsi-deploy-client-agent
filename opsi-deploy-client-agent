@@ -64,7 +64,7 @@ except ImportError:
 	WARNING_POLICY = None
 	REJECT_POLICY = None
 
-__version__ = '4.1.0.5'
+__version__ = '4.2.0.1'
 
 SKIP_MARKER = 'clientskipped'
 
