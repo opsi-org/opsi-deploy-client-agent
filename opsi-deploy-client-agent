@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/opsi-python
 # -*- coding: utf-8 -*-
 
 # This tool is part of the desktop management solution opsi
@@ -92,9 +92,9 @@ def winexe(cmd, host, username, password):
 		raise RuntimeError("Missing 'winexe'")
 
 	try:
-		logger.info('Winexe Version: {0}'.format(''.join(execute('{winexe} -V'.format(winexe=executable)))))
+		logger.info(u'Winexe Version: %s', ''.join(execute('{winexe} -V'.format(winexe=executable))))
 	except Exception as versionError:
-		logger.warning(u"Failed to get version: {0}".format(versionError))
+		logger.warning(u"Failed to get version: %s", versionError)
 
 	return execute(u"{winexe} -U '{credentials}' //{host} '{command}'".format(
 		winexe=executable,
@@ -172,12 +172,12 @@ class DeployThread(threading.Thread):
 				(hostname, _, _) = socket.gethostbyaddr(ip)
 				host = hostname
 			except socket.herror as error:
-				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
-				logger.warning(u"Could not get a hostname for {0}. This is needed to create a FQDN for the client in opsi.".format(ip))
+				logger.debug(u"Lookup for %s failed: %s", ip, error)
+				logger.warning(u"Could not get a hostname for %s. This is needed to create a FQDN for the client in opsi.", ip)
 				logger.info(u"Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
-			logger.debug(u"Lookup of IP returned hostname {0!r}".format(host))
+			logger.debug(u"Lookup of IP returned hostname %s", host)
 
 		host = host.replace('_', '-')
 
@@ -195,15 +195,15 @@ class DeployThread(threading.Thread):
 				except NameError:
 					pass  # no deployment via IP
 			except socket.gaierror as error:
-				logger.debug("Lookup of {0} failed.".format(host))
+				logger.debug("Lookup of %s failed.", host)
 
-		logger.debug(u"Host is now: {0!r}".format(host))
+		logger.debug(u"Host is now: %s", host)
 		if host.count(u'.') < 2:
 			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
 			hostId = forceHostId(host)
 
-		logger.info("Got hostId {0}".format(hostId))
+		logger.info("Got hostId %s", hostId)
 		return hostId
 
 	def _checkIfClientShouldBeSkipped(self, hostId):
@@ -211,7 +211,7 @@ class DeployThread(threading.Thread):
 			raise SkipClientException("Client {0} exists.".format(hostId))
 
 		if self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=hostId):
-			logger.warning("Tried to deploy to existing opsi server {0!r}. Skipping!".format(hostId))
+			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", hostId)
 			raise SkipClientException("Not deploying to server {0}.".format(hostId))
 
 	def _prepareDeploymentToHost(self, hostId):
@@ -227,32 +227,32 @@ class DeployThread(threading.Thread):
 		if self.deploymentMethod == 'ip':
 			return forceIPAddress(self.host)
 
-		logger.notice(u"Querying for ip address of host {0!r}".format(hostId))
+		logger.notice(u"Querying for ip address of host %s", hostId)
 		ipAddress = u''
-		logger.info(u"Getting host {0!r} by name".format(hostId))
+		logger.info(u"Getting host %s by name", hostId)
 		try:
 			ipAddress = socket.gethostbyname(hostId)
 		except Exception as error:
-			logger.warning(u"Failed to get ip address for host {0!r} by syscall: {1}".format(hostId, error))
+			logger.warning(u"Failed to get ip address for host %s by syscall: %s", hostId, error)
 
 		if ipAddress:
-			logger.notice(u"Got ip address {0!r} from syscall".format(ipAddress))
+			logger.notice(u"Got ip address %s from syscall", ipAddress)
 		else:
-			logger.info(u"Executing 'nmblookup {0}#20'".format(hostName))
+			logger.info(u"Executing 'nmblookup %s#20'", hostName)
 			for line in execute(u"nmblookup {0}#20".format(hostName)):
 				match = re.search("^(\d+\.\d+\.\d+\.\d+)\s+{0}<20>".format(hostName), line, re.IGNORECASE)
 				if match:
 					ipAddress = match.group(1)
 					break
 			if ipAddress:
-				logger.notice(u"Got ip address {0!r} from netbios lookup".format(ipAddress))
+				logger.notice(u"Got ip address %s from netbios lookup", ipAddress)
 			else:
 				raise Exception(u"Failed to get ip address for host {0!r}".format(hostName))
 
 		return ipAddress
 
 	def _pingClient(self, ipAddress):
-		logger.notice(u"Pinging host {0!r} ...".format(ipAddress))
+		logger.notice(u"Pinging host %s ...", ipAddress)
 		alive = False
 		try:
 			for line in execute(u"ping -q -c2 {address}".format(address=ipAddress)):
@@ -263,18 +263,18 @@ class DeployThread(threading.Thread):
 			logger.error(error)
 
 		if alive:
-			logger.notice(u"Host {0} is up".format(ipAddress))
+			logger.notice(u"Host %s is up", ipAddress)
 		elif self.stopOnPingFailure:
 			raise Exception(u"No ping response received from {0}".format(ipAddress))
 		else:
-			logger.warning(u"No ping response received from {0}".format(ipAddress))
+			logger.warning(u"No ping response received from %s", ipAddress)
 
 	def _createHostIfNotExisting(self, hostId, ipAddress):
 		if not self.backend.host_getIdents(type='OpsiClient', id=hostId):
-			logger.notice(u"Getting hardware ethernet address of host {0!r}".format(hostId))
+			logger.notice(u"Getting hardware ethernet address of host %s", hostId)
 			mac = self._getMacAddress(ipAddress)
 			if not mac:
-				logger.warning(u"Failed to get hardware ethernet address for IP {0}".format(ipAddress))
+				logger.warning(u"Failed to get hardware ethernet address for IP %s", ipAddress)
 
 			clientConfig = {
 				"id": hostId,
@@ -287,9 +287,9 @@ class DeployThread(threading.Thread):
 			}
 			if self.additionalClientSettings:
 				clientConfig.update(self.additionalClientSettings)
-				logger.debug("Updated config now is: {0}".format(clientConfig))
+				logger.debug("Updated config now is: %s", clientConfig)
 
-			logger.notice(u"Creating client {0!r}".format(hostId))
+			logger.notice(u"Creating client %s", hostId)
 			self.backend.host_createObjects([OpsiClient(**clientConfig)])
 			self._clientCreatedByScript = True
 			self._putClientIntoGroup(hostId)
@@ -308,9 +308,9 @@ class DeployThread(threading.Thread):
 		}
 		try:
 			self.backend.objectToGroup_createObjects([mapping])
-			logger.notice(u"Added {client!r} to group {group!r}".format(client=clientId, group=groupId))
+			logger.notice(u"Added %s to group %s", clientId, groupId)
 		except Exception as creationError:
-			logger.warning(u"Adding {client!r} to group {group!r} failed: {error}".format(client=clientId, group=groupId, error=creationError))
+			logger.warning(u"Adding %s to group %s failed: %s", clientId, groupId, creationError)
 
 	def _assignClientToDepot(self, clientId):
 		depot = self.depot
@@ -325,9 +325,9 @@ class DeployThread(threading.Thread):
 		}
 		try:
 			self.backend.configState_createObjects([depotAssignment])
-			logger.notice(u"Assigned {client!r} to depot {depot!r}".format(client=clientId, depot=depot))
+			logger.notice(u"Assigned %s to depot %s", clientId, depot)
 		except Exception as assignmentError:
-			logger.warning(u"Assgining {client!r} to depot {depot!r} failed: {error}".format(client=clientId, depot=depot, error=assignmentError))
+			logger.warning(u"Assgining %s to depot %s failed: %s", clientId, depot, assignmentError)
 
 	@staticmethod
 	def _getMacAddress(ipAddress):
@@ -345,7 +345,7 @@ class DeployThread(threading.Thread):
 		if not mac or (mac == u'00:00:00:00:00:00'):
 			mac = u''
 		else:
-			logger.notice(u"Found hardware ethernet address {0!r}".format(mac))
+			logger.notice(u"Found hardware ethernet address %s", mac)
 
 		return mac
 
@@ -376,7 +376,7 @@ class DeployThread(threading.Thread):
 
 	def _removeHostFromBackend(self, host):
 		try:
-			logger.notice('Deleting client {0} from backend.'.format(host))
+			logger.notice('Deleting client %s from backend.', host)
 			self.backend.host_deleteObjects([host])
 		except Exception as error:
 			logger.error(error)
@@ -409,7 +409,7 @@ class WindowsDeployThread(DeployThread):
 			hostId = self._getHostId(host)
 			self._checkIfClientShouldBeSkipped(hostId)
 
-			logger.notice(u"Starting deployment to host {0!r}".format(hostId))
+			logger.notice(u"Starting deployment to host %s", hostId)
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._testWinexeConnection()
 
@@ -437,7 +437,7 @@ class WindowsDeployThread(DeployThread):
 				execute(cmd)
 
 				logger.notice(u"Installing opsi-client-agent")
-				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
+				cmd = u'c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\tmp\\opsi-client-agent_inst\\files\\opsi\\setup.opsiscript c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'
 				for trynum in (1, 2):
 					try:
 						winexe(cmd, self.networkAddress, self.username, self.password)
@@ -445,7 +445,7 @@ class WindowsDeployThread(DeployThread):
 					except Exception as error:
 						if trynum == 2:
 							raise Exception(u"Failed to install opsi-client-agent: {0}".format(error))
-						logger.info(u"Winexe failure {0!r}, retrying".format(error))
+						logger.info(u"Winexe failure %s, retrying", error)
 						time.sleep(2)
 			finally:
 				os.remove('/tmp/{0}'.format(configIniName))
@@ -456,16 +456,16 @@ class WindowsDeployThread(DeployThread):
 				except Exception as error:
 					logger.error(error)
 
-			logger.notice(u"opsi-client-agent successfully installed on {0!r}".format(hostId))
+			logger.notice(u"opsi-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
-			logger.notice(u"Skipping host {0!r}".format(hostId))
+			logger.notice(u"Skipping host %s", hostId)
 			self.success = SKIP_MARKER
 			return
 		except Exception as error:
-			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			logger.error(u"Deployment to %s failed: %s", self.host, error)
 			self.success = False
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
@@ -477,7 +477,7 @@ class WindowsDeployThread(DeployThread):
 				(hostname, _, _) = socket.gethostbyaddr(ip)
 				host = hostname
 			except socket.herror as error:
-				logger.debug("Lookup for {0} failed: {1}".format(ip, error))
+				logger.debug("Lookup for %s failed: %s", ip, error)
 
 				try:
 					output = winexe(u'cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
@@ -489,10 +489,10 @@ class WindowsDeployThread(DeployThread):
 							host = line.strip()
 							break
 				except Exception as error:
-					logger.debug("Name lookup via winexe failed: {0}".format(error))
+					logger.debug("Name lookup via winexe failed: %s", error)
 					raise Exception("Can't find name for IP {0}: {1}".format(ip, error))
 
-			logger.debug(u"Lookup of IP returned hostname {0!r}".format(host))
+			logger.debug(u"Lookup of IP returned hostname %s", host)
 
 		host = host.replace('_', '-')
 
@@ -510,15 +510,15 @@ class WindowsDeployThread(DeployThread):
 				except NameError:
 					pass  # no deployment via IP
 			except socket.gaierror as error:
-				logger.debug("Lookup of {0} failed.".format(host))
+				logger.debug("Lookup of %s failed.", host)
 
-		logger.debug(u"Host is now: {0!r}".format(host))
+		logger.debug(u"Host is now: %s", host)
 		if host.count(u'.') < 2:
 			hostId = forceHostId(u'{hostname}.{domain}'.format(hostname=host, domain=u'.'.join(getFQDN().split(u'.')[1:])))
 		else:
 			hostId = forceHostId(host)
 
-		logger.info("Got hostId {0}".format(hostId))
+		logger.info("Got hostId %s", hostId)
 		return hostId
 
 	def _testWinexeConnection(self):
@@ -530,22 +530,22 @@ class WindowsDeployThread(DeployThread):
 				break
 			except Exception as error:
 				if 'NT_STATUS_LOGON_FAILURE' in forceUnicode(error):
-					logger.warning("Can't connect to {0}: check your credentials".format(self.networkAddress))
+					logger.warning("Can't connect to %s: check your credentials", self.networkAddress)
 				elif 'NT_STATUS_IO_TIMEOUT' in forceUnicode(error):
-					logger.warning("Can't connect to {0}: firewall on client seems active".format(self.networkAddress))
+					logger.warning("Can't connect to %s: firewall on client seems active", self.networkAddress)
 
 				if trynum == 2:
 					raise Exception(u"Failed to execute command on host {0!r}: winexe error: {1}".format(self.networkAddress, error))
-				logger.info(u"Winexe failure {0!r}, retrying".format(error))
+				logger.info(u"Winexe failure %s, retrying", error)
 				time.sleep(2)
 
 	def _finaliseInstallation(self):
 		if self.reboot or self.shutdown:
 			if self.reboot:
-				logger.notice(u"Rebooting machine {0!r}".format(self.networkAddress))
+				logger.notice(u"Rebooting machine %s", self.networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /R /T:20 "opsi-client-agent installed - reboot" /Y /C'
 			elif self.shutdown:
-				logger.notice(u"Shutting down machine {0!r}".format(self.networkAddress))
+				logger.notice(u"Shutting down machine %s", self.networkAddress)
 				cmd = u'"%ProgramFiles%\\opsi.org\\opsi-client-agent\\utilities\\shutdown.exe" /L /T:20 "opsi-client-agent installed - shutdown" /Y /C'
 
 			try:
@@ -571,18 +571,18 @@ class WindowsDeployThread(DeployThread):
 				if not pf:
 					raise Exception(u"Failed to get program files path")
 
-				logger.info(u"Program files path is {0!r}".format(pf))
+				logger.info(u"Program files path is %s", pf)
 				winexe(cmd.replace(u'%ProgramFiles%', pf), self.networkAddress, self.username, self.password)
 			except Exception as error:
 				if self.reboot:
-					logger.error(u"Failed to reboot computer: {0}".format(error))
+					logger.error(u"Failed to reboot computer: %s", error)
 				else:
-					logger.error(u"Failed to shutdown computer: {0}".format(error))
+					logger.error(u"Failed to shutdown computer: %s", error)
 		elif self.startService:
 			try:
 				winexe(u'net start opsiclientd', self.networkAddress, self.username, self.password)
 			except Exception as error:
-				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=self.networkAddress, error=error))
+				logger.error("Failed to start opsiclientd on %s: %s", self.networkAddress, error=error)
 
 	def _installWithServersideMount(self):
 		logger.debug('Installing using server-side mount.')
@@ -595,7 +595,7 @@ class WindowsDeployThread(DeployThread):
 			hostId = self._getHostId(host)
 			self._checkIfClientShouldBeSkipped(hostId)
 
-			logger.notice(u"Starting deployment to host {0!r}".format(hostId))
+			logger.notice(u"Starting deployment to host %s", hostId)
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._testWinexeConnection()
 
@@ -615,7 +615,7 @@ class WindowsDeployThread(DeployThread):
 						timeout=15
 					)
 				except Exception as error:
-					logger.info(u"Failed to mount clients c$ share: {0}, retrying with port 139".format(error))
+					logger.info(u"Failed to mount clients c$ share: %s, retrying with port 139", error)
 					execute(u"{mount} -t cifs -o'port=139,username={username},password={password}' //{address}/c$ {target}".format(
 							mount=which('mount'),
 							username=self.username,
@@ -650,7 +650,7 @@ class WindowsDeployThread(DeployThread):
 			logger.notice(u"Installing opsi-client-agent")
 			if not os.path.exists(os.path.join(mountDir, 'tmp')):
 				os.makedirs(os.path.join(mountDir, 'tmp'))
-			cmd = u'c:\\{0}\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\{0}\\files\\opsi\\setup.ins c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'.format(instDirName)
+			cmd = u'c:\\{0}\\files\\opsi\\opsi-winst\\winst32.exe /batch c:\\{0}\\files\\opsi\\setup.opsiscript c:\\tmp\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY'.format(instDirName)
 			for trynum in (1, 2):
 				try:
 					winexe(cmd, self.networkAddress, self.username, self.password)
@@ -658,20 +658,20 @@ class WindowsDeployThread(DeployThread):
 				except Exception as error:
 					if trynum == 2:
 						raise Exception(u"Failed to install opsi-client-agent: {0}".format(error))
-					logger.info(u"Winexe failure {0!r}, retrying".format(error))
+					logger.info(u"Winexe failure %s, retrying", error)
 					time.sleep(2)
 
-			logger.notice(u"opsi-client-agent successfully installed on {0!r}".format(hostId))
+			logger.notice(u"opsi-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
-			logger.notice(u"Skipping host {0!r}".format(hostId))
+			logger.notice(u"Skipping host %s", hostId)
 			self.success = SKIP_MARKER
 			return
 		except Exception as error:
 			self.success = False
-			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			logger.error(u"Deployment to %s failed: %s", self.host, error)
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
 		finally:
@@ -682,18 +682,18 @@ class WindowsDeployThread(DeployThread):
 				try:
 					shutil.rmtree(instDir)
 				except OSError as err:
-					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
+					logger.debug('Removing %s failed: %s', instDir, err)
 
 			if mountDir:
 				try:
 					umount(mountDir)
 				except Exception as err:
-					logger.warning('Unmounting {0} failed: {1}'.format(mountDir, err))
+					logger.warning('Unmounting %s failed: %s', mountDir, err)
 
 				try:
 					os.rmdir(mountDir)
 				except OSError as err:
-					logger.debug('Removing {0} failed: {1}'.format(instDir, err))
+					logger.debug('Removing %s failed: %s', instDir, err)
 
 
 class LinuxDeployThread(DeployThread):
@@ -723,7 +723,7 @@ class LinuxDeployThread(DeployThread):
 			hostId = self._getHostId(host)
 			self._checkIfClientShouldBeSkipped(hostId)
 
-			logger.notice(u"Starting deployment to host {0!r}".format(hostId))
+			logger.notice(u"Starting deployment to host %s", hostId)
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._executeViaSSH("echo 'it works'")
 
@@ -760,7 +760,7 @@ class LinuxDeployThread(DeployThread):
 					raise RuntimeError("Could not get architecture of client.")
 
 				opsiscript = "/tmp/opsi-linux-client-agent/files/opsi/opsi-script/{arch}/opsi-script-nogui".format(arch=remoteArch)
-				logger.debug("Will use: {0}".format(opsiscript))
+				logger.debug("Will use: %s", opsiscript)
 				self._executeViaSSH("chmod +x {0}".format(opsiscript))
 
 				installCommand = "{0} -batch /tmp/opsi-linux-client-agent/files/opsi/setup.opsiscript /var/log/opsi-client-agent/opsi-script/opsi-client-agent.log -PARAMETER REMOTEDEPLOY".format(opsiscript)
@@ -792,23 +792,23 @@ class LinuxDeployThread(DeployThread):
 				try:
 					os.remove(configIniPath)
 				except OSError as error:
-					logger.debug("Removing {0} failed: {1}".format(configIniPath, error))
+					logger.debug("Removing %s failed: %s", configIniPath, error)
 
 				try:
 					self._executeViaSSH("rm -rf {tempfolder}".format(tempfolder=remoteFolder))
 				except (Exception, paramiko.SSHException) as error:
 					logger.error(error)
 
-			logger.notice(u"opsi-linux-client-agent successfully installed on {0!r}".format(hostId))
+			logger.notice(u"opsi-linux-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
 			self._finaliseInstallation()
 		except SkipClientException:
-			logger.notice(u"Skipping host {0!r}".format(hostId))
+			logger.notice(u"Skipping host %s", hostId)
 			self.success = SKIP_MARKER
 			return
 		except (Exception, paramiko.SSHException) as error:
-			logger.error(u"Deployment to {0!r} failed: {1}".format(self.host, error))
+			logger.error(u"Deployment to %s failed: %s", self.host, error)
 			self.success = False
 			if 'Incompatible ssh peer (no acceptable kex algorithm)' in forceUnicode(error):
 				logger.error('Please install paramiko v1.15.1 or newer.')
@@ -820,7 +820,7 @@ class LinuxDeployThread(DeployThread):
 				try:
 					self._sshConnection.close()
 				except Exception as error:
-					logger.debug2("Closing SSH connection failed: {0}".format(error))
+					logger.debug2("Closing SSH connection failed: %s", error)
 
 	def _executeViaSSH(self, command):
 		"""
@@ -831,23 +831,21 @@ class LinuxDeployThread(DeployThread):
 		"""
 		self._connectViaSSH()
 
-		logger.debug("Executing on remote: {0}".format(command))
+		logger.debug("Executing on remote: %s", command)
 
 		with closing(self._sshConnection.get_transport().open_session()) as channel:
 			channel.set_combine_stderr(True)
 			channel.settimeout(None)  # blocking until completion of command
 
 			channel.exec_command(command)
-
-			out = channel.makefile("rb", -1)
 			exitCode = channel.recv_exit_status()
+			out = channel.makefile("rb", -1).read().decode("utf-8", "replace")
 
-			logger.debug("Exit code was: {0!r}".format(exitCode))
+			logger.debug("Exit code was: %s", exitCode)
 
 			if exitCode:
 				logger.debug("Command output: ")
-				for line in out:
-					logger.debug(line)
+				logger.debug(out)
 				raise SSHRemoteExecutionException(
 					u"Executing {0!r} on remote client failed! "
 					u"Got exit code {1}".format(command, exitCode)
@@ -858,7 +856,7 @@ class LinuxDeployThread(DeployThread):
 	def _getTargetArchitecture(self):
 		logger.debug("Checking architecture of client...")
 		output = self._executeViaSSH('uname -m')
-		if "64" not in output.read():
+		if "64" not in output:
 			return "32"
 		else:
 			return "64"
@@ -896,7 +894,7 @@ class LinuxDeployThread(DeployThread):
 			try:
 				ftpConnection.mkdir(path)
 			except Exception as error:
-				logger.debug("Can't create {0} on remote: {1}".format(path, error))
+				logger.debug("Can't create %s on remote: %s", path, error)
 
 		self._connectViaSSH()
 
@@ -917,27 +915,27 @@ class LinuxDeployThread(DeployThread):
 						local = os.path.join(dirpath, filename)
 						remote = os.path.join(remotePath, dirpath, filename)
 
-						logger.debug2("Copying {0} -> {1}".format(local, remote))
+						logger.debug2("Copying %s -> %s", local, remote)
 						ftpConnection.put(local, remote)
 
 	def _finaliseInstallation(self):
 		if self.reboot:
-			logger.notice(u"Rebooting machine {0!r}".format(self.networkAddress))
+			logger.notice(u"Rebooting machine %s", self.networkAddress)
 			try:
 				self._executeViaSSH("shutdown -r 1 & disown")
 			except Exception as error:
-				logger.error(u"Failed to reboot computer: {0}".format(error))
+				logger.error(u"Failed to reboot computer: %s", error)
 		elif self.shutdown:
-			logger.notice(u"Shutting down machine {0!r}".format(self.networkAddress))
+			logger.notice(u"Shutting down machine %s", self.networkAddress)
 			try:
 				self._executeViaSSH("shutdown -h 1 & disown")
 			except Exception as error:
-				logger.error(u"Failed to shutdown computer: {0}".format(error))
+				logger.error(u"Failed to shutdown computer: %s", error)
 		elif self.startService:
 			try:
-				self._executeViaSSH("service opsiclientd start || echo 'Already started.'")
+				self._executeViaSSH("service opsiclientd restart")
 			except Exception as error:
-				logger.error("Failed to start opsiclientd on {host}: {error}".format(host=self.networkAddress, error=error))
+				logger.error("Failed to restart opsiclientd on %s: %s", self.networkAddress, error)
 
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
@@ -1104,7 +1102,7 @@ def main(argv):
 					host, description = line.split(None, 1)
 					additionalHostInfos[host] = {"description": description}
 				except ValueError as error:
-					logger.debug("Splitting line '{0}' failed: {1}".format(line, error))
+					logger.debug("Splitting line '%s' failed: %s", line, error)
 					host = line
 
 				hosts.append(forceUnicodeLower(host))
@@ -1112,7 +1110,7 @@ def main(argv):
 	if not hosts:
 		raise Exception("No hosts given.")
 
-	logger.debug('Deploying to the following hosts: {0}'.format(hosts))
+	logger.debug('Deploying to the following hosts: %s', hosts)
 
 	password = args.password
 	if not password:
@@ -1181,68 +1179,67 @@ def main(argv):
 	if args.group and not backend.group_getObjects(id=args.group):
 		raise ValueError(u"Group {0} does not exist.".format(args.group))
 
-	runningThreads = []
-	while hosts:
-		while len(runningThreads) >= maxThreads:
-			time.sleep(1)
-			for thread in runningThreads:
-				if thread.isAlive():
-					continue
-				runningThreads.remove(thread)
-				break
-
-		host = hosts.pop()
-
-		clientConfig = {
-			"host": host,
-			"backend": backend,
-			"username": args.username,
-			"password": password,
-			"shutdown": args.shutdown,
-			"reboot": args.reboot,
-			"startService": args.startService,
-			"deploymentMethod": deploymentMethod,
-			"stopOnPingFailure": args.stopOnPingFailure,
-			"skipExistingClient": args.skipExistingClient,
-			"mountWithSmbclient": mountWithSmbclient,
-			"keepClientOnFailure": args.keepClientOnFailure,
-			"depot": args.depot,
-			"group": args.group,
-		}
-
-		try:
-			clientConfig['additionalClientSettings'] = additionalHostInfos[host]
-		except KeyError:
-			pass
-
-		if deployLinux:
-			clientConfig["sshPolicy"] = args.sshHostkeyPolicy or WARNING_POLICY
-
-		thread = deploymentClass(**clientConfig)
-
-		thread.start()
-		runningThreads.append(thread)
-		time.sleep(0.5)
-
+	total = 0
 	fails = 0
 	skips = 0
-	for thread in runningThreads:
-		if thread.isAlive():
-			thread.join()
 
-		if thread.success == SKIP_MARKER:
-			skips += 1
-		elif not thread.success:
-			fails += 1
+	runningThreads = []
+	while hosts or runningThreads:
+		if hosts and len(runningThreads) < maxThreads:
+			# start new thread
+			host = hosts.pop()
 
-	total = len(runningThreads)
+			clientConfig = {
+				"host": host,
+				"backend": backend,
+				"username": args.username,
+				"password": password,
+				"shutdown": args.shutdown,
+				"reboot": args.reboot,
+				"startService": args.startService,
+				"deploymentMethod": deploymentMethod,
+				"stopOnPingFailure": args.stopOnPingFailure,
+				"skipExistingClient": args.skipExistingClient,
+				"mountWithSmbclient": mountWithSmbclient,
+				"keepClientOnFailure": args.keepClientOnFailure,
+				"depot": args.depot,
+				"group": args.group,
+			}
+
+			try:
+				clientConfig['additionalClientSettings'] = additionalHostInfos[host]
+			except KeyError:
+				pass
+
+			if deployLinux:
+				clientConfig["sshPolicy"] = args.sshHostkeyPolicy or WARNING_POLICY
+
+			thread = deploymentClass(**clientConfig)
+			total += 1
+			thread.daemon = True
+			thread.start()
+			runningThreads.append(thread)
+			time.sleep(0.5)
+
+		newRunningThreads = []
+		for thread in runningThreads:
+			if thread.isAlive():
+				newRunningThreads.append(thread)
+			else:
+				if thread.success == SKIP_MARKER:
+					skips += 1
+				elif not thread.success:
+					fails += 1
+		runningThreads = newRunningThreads
+		time.sleep(1)
+	
 	success = total - fails - skips
 
-	logger.notice("{}/{} deployments successfully", success, total)
+	logger.notice("%s/%s deployments successfully", success, total)
 	if skips:
-		logger.notice("{}/{} deployments skipped", skips, total)
+		logger.notice("%s/%s deployments skipped", skips, total)
 	if fails:
-		logger.warning("{}/{} deployments failed", fails, total)
+		logger.warning("%s/%s deployments failed", fails, total)
 
 	if fails:
 		return 1
