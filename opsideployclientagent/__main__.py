@@ -728,7 +728,7 @@ class LinuxDeployThread(DeployThread):
 			if getattr(sys, 'frozen', False):
 				localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
 			else:
-				localFolder = os.path.dirname(os.path.abspath(__file__))		# for running from python
+				localFolder = os.path.dirname(os.path.abspath(__file__))			# for running from python
 			logger.notice(u"Patching config.ini")
 			configIniName = u'{random}_config.ini'.format(random=randomString(10))
 			configIniPath = os.path.join('/tmp', configIniName)
