@@ -26,8 +26,8 @@ build:windows-pyinstaller:
     - win10
   script:
     - pip install poetry
-	  - poetry install
-	  - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
+    - poetry install
+    - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
     - poetry run opsi-dev-tool -l info --signserver-sign dist\opsi-deploy-client-agent.exe
     - if (! $CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe "$CI_JOB_ID"}
     - if ($CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe}
