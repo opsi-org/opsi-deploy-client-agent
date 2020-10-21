@@ -1,0 +1,22 @@
+pyinstaller-poetry:
+  one_file: yes
+  hidden_imports:
+    all: []
+    windows: []
+    linux: []
+    darwin: []
+  scripts:
+    - script: run-opsi-deploy-client-agent
+      binaries:
+        - opsi-deploy-client-agent
+  before_script:
+    linux: []
+    darwin: []
+    windows: []
+  data_files: []
+  dirname: opsideployclientagent
+  locale_install: []
+  after_script:
+    linux: []
+    darwin: []
+    windows: []

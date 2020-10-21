@@ -1,4 +1,3 @@
-#! /usr/bin/opsi-python
 # -*- coding: utf-8 -*-
 
 # This tool is part of the desktop management solution opsi
@@ -29,8 +28,6 @@ installed via opsi.
 :author: Niko Wenselowski <n.wenselowski@uib.de>
 :license: GNU Affero General Public License version 3
 """
-
-from __future__ import print_function
 
 import argparse
 import getpass
@@ -64,7 +61,8 @@ except ImportError:
 	WARNING_POLICY = None
 	REJECT_POLICY = None
 
-__version__ = '4.2.0.1'
+from . import __version__
+
 
 SKIP_MARKER = 'clientskipped'
 
@@ -727,7 +725,10 @@ class LinuxDeployThread(DeployThread):
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._executeViaSSH("echo 'it works'")
 
-			localFolder = os.path.dirname(os.path.abspath(__file__))
+			localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+			if "python" in localFolder:
+				localFolder = os.path.dirname(os.path.abspath(__file__))		# for running from python
+
 			logger.notice(u"Patching config.ini")
 			configIniName = u'{random}_config.ini'.format(random=randomString(10))
 			configIniPath = os.path.join('/tmp', configIniName)
@@ -948,12 +949,25 @@ class LinuxDeployThread(DeployThread):
 		self.backend.productOnClient_updateObjects([poc])
 
 
-def main(argv):
+def main():
+	logger.setConsoleColor(True)
+
+	workdir = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+	if "python" in workdir:
+		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
+	try:
+		os.chdir(workdir)
+	except Exception as error:
+		logger.setConsoleLevel(LOG_ERROR)
+		logger.logException(error)
+		print(u"ERROR: {0}".format(forceUnicode(error)), file=sys.stderr)
+		raise error
+
 	logger.setConsoleLevel(LOG_NOTICE)
 
 	# If we are inside a folder with 'opsi-linux-client-agent' in it's
 	# name we assume that we want to deploy the opsi-linux-client-agent.
-	deployLinux = 'opsi-linux-client-agent' in os.path.dirname(os.path.abspath(__file__))
+	deployLinux = 'opsi-linux-client-agent' in workdir
 
 	scriptDescription = u"Deploy opsi client agent to the specified clients."
 	if deployLinux:
@@ -1072,7 +1086,7 @@ def main(argv):
 	parser.add_argument('host', nargs='*',
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
-	args = parser.parse_args(argv)
+	args = parser.parse_args()
 
 	logger.setConsoleLevel(args.logLevel)
 
@@ -1247,16 +1261,4 @@ def main(argv):
 		return 0
 
 if __name__ == "__main__":
-	logger.setConsoleLevel(LOG_WARNING)
-	logger.setConsoleColor(True)
-
-	try:
-		os.chdir(os.path.dirname(os.path.abspath(__file__)))
-		exitCode = main(sys.argv[1:])
-	except Exception as error:
-		logger.setConsoleLevel(LOG_ERROR)
-		logger.logException(error)
-		print(u"ERROR: {0}".format(forceUnicode(error)), file=sys.stderr)
-		raise error
-
-	sys.exit(exitCode)
+	main()
