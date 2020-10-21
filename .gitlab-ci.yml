@@ -12,6 +12,7 @@ build:linux-pyinstaller:
     - source $HOME/.poetry/env
     - poetry install
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
+    - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
     - '[ "$CI_COMMIT_TAG" = "" ] || poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent'
   artifacts:
@@ -29,6 +30,7 @@ build:windows-pyinstaller:
     - poetry install
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
     - poetry run opsi-dev-tool -l info --signserver-sign dist\opsi-deploy-client-agent.exe
+    - .\dist\opsi-deploy-client-agent.exe --version
     - if (! $CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe "$CI_JOB_ID"}
     - if ($CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe}
   artifacts:
@@ -45,6 +47,7 @@ build:osx-pyinstaller:
     - source $HOME/.poetry/env
     - poetry install
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
+    - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
     - '[ "$CI_COMMIT_TAG" = "" ] || poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent'
   artifacts:
