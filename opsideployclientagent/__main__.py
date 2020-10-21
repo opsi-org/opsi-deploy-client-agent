@@ -725,10 +725,10 @@ class LinuxDeployThread(DeployThread):
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._executeViaSSH("echo 'it works'")
 
-			localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
-			if "python" in localFolder:
+			if getattr(sys, 'frozen', False):
+				localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+			else:
 				localFolder = os.path.dirname(os.path.abspath(__file__))		# for running from python
-
 			logger.notice(u"Patching config.ini")
 			configIniName = u'{random}_config.ini'.format(random=randomString(10))
 			configIniPath = os.path.join('/tmp', configIniName)
@@ -952,8 +952,9 @@ class LinuxDeployThread(DeployThread):
 def main():
 	logger.setConsoleColor(True)
 
-	workdir = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
-	if "python" in workdir:
+	if getattr(sys, 'frozen', False):
+		workdir = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+	else:
 		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
 	try:
 		os.chdir(workdir)
