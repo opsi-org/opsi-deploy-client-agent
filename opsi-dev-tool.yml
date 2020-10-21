@@ -4,7 +4,8 @@ pyinstaller-poetry:
     all: []
     windows: []
     linux: []
-    darwin: []
+    darwin:
+      - tkinter
   scripts:
     - script: run-opsi-deploy-client-agent
       binaries:
