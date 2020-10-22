@@ -5,6 +5,10 @@ pyinstaller-poetry:
     windows: []
     linux: []
     darwin: []
+  extra_args:
+    darwin:
+      - --exclude-module
+      - tkinter
   scripts:
     - script: run-opsi-deploy-client-agent
       binaries:
