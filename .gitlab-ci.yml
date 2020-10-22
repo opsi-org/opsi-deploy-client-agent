@@ -45,6 +45,7 @@ build:osx-pyinstaller:
     - macos
   script:
     - source $HOME/.poetry/env
+    - rm poetry.lock   # as debug test
     - poetry install
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
     - ./dist/opsi-deploy-client-agent --version
