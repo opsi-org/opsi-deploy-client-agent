@@ -4,9 +4,15 @@ stages:
   - build
   - package
 
+.get-opsi-server: &get-opsi-server |
+  url=$(git remote -v | grep fetch | cut -f2 | sed s'#/opsi-deploy-client-agent.git.*#/opsi-server.git#')
+  GIT_TERMINAL_PROMPT=0 git clone $url ../opsi-server
+  cp -a ../opsi-server/opsi-server_data/etc /etc/opsi
+
 build:linux-pyinstaller:
   stage: build
   script:
+    - *get-opsi-server
     - apt -y install curl
     - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3
     - source $HOME/.poetry/env
@@ -21,37 +27,37 @@ build:linux-pyinstaller:
       - dist/opsi-deploy-client-agent
     expire_in: 2 day
 
-build:windows-pyinstaller:
-  stage: build
-  tags:
-    - win10
-  script:
-    - pip install poetry
-    - poetry install
-    - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
-    - poetry run opsi-dev-tool -l info --signserver-sign dist\opsi-deploy-client-agent.exe
-    - .\dist\opsi-deploy-client-agent.exe --version
-    - if (! $CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe "$CI_JOB_ID"}
-    - if ($CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe}
-  artifacts:
-    name: 'deploy-windows-pyinstaller'
-    paths:
-      - dist\opsi-deploy-client-agent.exe
-    expire_in: 2 day
+#build:windows-pyinstaller:
+#  stage: build
+#  tags:
+#    - win10
+#  script:
+#    - pip install poetry
+#    - poetry install
+#    - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
+#    - poetry run opsi-dev-tool -l info --signserver-sign dist\opsi-deploy-client-agent.exe
+#    - .\dist\opsi-deploy-client-agent.exe --version
+#    - if (! $CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe "$CI_JOB_ID"}
+#    - if ($CI_COMMIT_TAG) {poetry run opsi-dev-tool -l info --binary-push dist\opsi-deploy-client-agent.exe}
+#  artifacts:
+#    name: 'deploy-windows-pyinstaller'
+#    paths:
+#      - dist\opsi-deploy-client-agent.exe
+#    expire_in: 2 day
 
-build:osx-pyinstaller:
-  stage: build
-  tags:
-    - macos
-  script:
-    - source $HOME/.poetry/env
-    - poetry install
-    - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
-    - ./dist/opsi-deploy-client-agent --version
-    - '[ "$CI_COMMIT_TAG" = "" ] && poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
-    - '[ "$CI_COMMIT_TAG" = "" ] || poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent'
-  artifacts:
-    name: 'deploy-macos-pyinstaller'
-    paths:
-      - dist/opsi-deploy-client-agent
-    expire_in: 2 day
+#build:osx-pyinstaller:
+#  stage: build
+#  tags:
+#    - macos
+#  script:
+#    - source $HOME/.poetry/env
+#    - poetry install
+#    - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
+#    - ./dist/opsi-deploy-client-agent --version
+#    - '[ "$CI_COMMIT_TAG" = "" ] && poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
+#    - '[ "$CI_COMMIT_TAG" = "" ] || poetry run opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent'
+#  artifacts:
+#    name: 'deploy-macos-pyinstaller'
+#    paths:
+#      - dist/opsi-deploy-client-agent
+#    expire_in: 2 day
