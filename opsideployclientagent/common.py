@@ -6,7 +6,7 @@ import re
 from OPSI.System import execute, getFQDN
 from OPSI.Object import OpsiClient, ProductOnClient
 from OPSI.Logger import Logger, LOG_DEBUG, LOG_ERROR, LOG_NOTICE, LOG_WARNING
-from OPSI.Types import forceHostId, forceIPAddress, forceUnicode, forceUnicodeLower
+from OPSI.Types import forceHostId, forceIPAddress, forceUnicode, forceUnicodeLower, forceInt
 
 
 SKIP_MARKER = 'clientskipped'
