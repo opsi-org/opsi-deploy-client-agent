@@ -5,9 +5,10 @@ stages:
   - package
 
 .get-opsi-server: &get-opsi-server |
+  rm -r ./opsi-server
   url=$(git remote -v | grep fetch | cut -f2 | sed s'#/opsi-deploy-client-agent.git.*#/opsi-server.git#')
-  GIT_TERMINAL_PROMPT=0 git clone $url ../opsi-server
-  cp -a ../opsi-server/opsi-server_data/etc /etc/opsi
+  GIT_TERMINAL_PROMPT=0 git clone $url
+  cp -a opsi-server/opsi-server_data/etc /etc/opsi
 
 build:linux-pyinstaller:
   stage: build
