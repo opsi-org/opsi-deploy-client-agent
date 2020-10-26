@@ -8,7 +8,7 @@ from OPSI.Types import forceUnicode, forceUnicodeLower
 from OPSI.System import copy, execute
 from OPSI.Object import ProductOnClient
 
-from .common import DeployThread, SkipClientException, SKIP_MARKER
+from .common import logger, DeployThread, SkipClientException, SKIP_MARKER
 
 try:
 	import paramiko

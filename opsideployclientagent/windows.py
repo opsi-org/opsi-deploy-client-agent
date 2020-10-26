@@ -9,7 +9,7 @@ from OPSI.Util import randomString
 from OPSI.Types import forceHostId, forceIPAddress, forceUnicode, forceUnicodeLower
 from OPSI.System import copy, execute, getFQDN, umount, which
 
-from .common import DeployThread, SkipClientException, SKIP_MARKER
+from .common import logger, DeployThread, SkipClientException, SKIP_MARKER
 
 def winexe(cmd, host, username, password):
 	cmd = forceUnicode(cmd)
