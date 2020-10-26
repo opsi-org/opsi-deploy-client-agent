@@ -1,7 +1,8 @@
 pyinstaller-poetry:
   one_file: yes
   hidden_imports:
-    all: []
+    all:
+      - OPSI.Backend.*
     windows: []
     linux: []
     darwin: []
