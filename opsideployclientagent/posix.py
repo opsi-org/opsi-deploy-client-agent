@@ -130,11 +130,6 @@ class LinuxDeployThread(DeployThread):
 				except OSError as error:
 					logger.debug("Removing %s failed: %s", configIniPath, error)
 
-				try:
-					self._executeViaSSH("rm -rf {tempfolder}".format(tempfolder=remoteFolder))
-				except (Exception, paramiko.SSHException) as error:
-					logger.error(error)
-
 			logger.notice(u"opsi-linux-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
@@ -157,6 +152,12 @@ class LinuxDeployThread(DeployThread):
 					self._sshConnection.close()
 				except Exception as error:
 					logger.debug2("Closing SSH connection failed: %s", error)
+		finally:
+			try:
+				self._executeViaSSH("rm -rf {tempfolder}".format(tempfolder=remoteFolder))
+			except (Exception, paramiko.SSHException) as error:
+				logger.error(error)
+
 
 	def _executeViaSSH(self, command):
 		"""
