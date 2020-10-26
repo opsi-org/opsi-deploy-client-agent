@@ -102,7 +102,7 @@ class LinuxDeployThread(DeployThread):
 					self._executeViaSSH("chmod 600 {credfile}".format(credfile=credentialsfile))
 					self._executeViaSSH("echo '{password}' > {credfile}".format(password=self.password, credfile=credentialsfile))
 					self._executeViaSSH('echo "\n" >> {credfile}'.format(password=self.password, credfile=credentialsfile))
-					installCommand = "sudo --stdin -- {command} < {credfile}".format(command=installCommand, credfile=credentialsfile)
+					installCommand = f"sudo --stdin -- {installCommand} < {credentialsfile}"
 
 				try:
 					logger.notice('Running installation script...')
@@ -119,7 +119,7 @@ class LinuxDeployThread(DeployThread):
 				checkCommand = "test -e /etc/opsi-client-agent/opsiclientd.conf"
 				if nonrootExecution:
 					# This call is executed with sudo, because etc/opsi-client-agent belongs to root:root
-					checkCommand = "sudo --stdin -- {command} < {credfile}".format(command=checkCommand, credfile=credentialsfile)
+					checkCommand = f"sudo --stdin -- {checkCommand} < {credentialsfile}"
 				self._executeViaSSH(checkCommand)
 
 				logger.debug("Testing if executable was found...")
@@ -138,7 +138,7 @@ class LinuxDeployThread(DeployThread):
 			logger.notice(u"opsi-linux-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation()
+			self._finaliseInstallation(nonrootExecution=nonrootExecution)
 		except SkipClientException:
 			logger.notice(u"Skipping host %s", hostId)
 			self.success = SKIP_MARKER
@@ -254,12 +254,10 @@ class LinuxDeployThread(DeployThread):
 						logger.debug2("Copying %s -> %s", local, remote)
 						ftpConnection.put(local, remote)
 
-	def _finaliseInstallation(self):
+	def _finaliseInstallation(self, nonrootExecution=False):
 		if self.reboot:
 			logger.notice(u"Rebooting machine %s", self.networkAddress)
 			command = "shutdown -r 1 & disown"
-			if nonrootExecution:
-				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
 				self._executeViaSSH(command)
 			except Exception as error:
@@ -267,8 +265,6 @@ class LinuxDeployThread(DeployThread):
 		elif self.shutdown:
 			logger.notice(u"Shutting down machine %s", self.networkAddress)
 			command = "shutdown -h 1 & disown"
-			if nonrootExecution:
-				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
 				self._executeViaSSH(command)
 			except Exception as error:
