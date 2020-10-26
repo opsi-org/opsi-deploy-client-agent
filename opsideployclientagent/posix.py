@@ -138,7 +138,7 @@ class LinuxDeployThread(DeployThread):
 			logger.notice(u"opsi-linux-client-agent successfully installed on %s", hostId)
 			self.success = True
 			self._setOpsiClientAgentToInstalled(hostId)
-			self._finaliseInstallation(nonrootExecution=nonrootExecution)
+			self._finaliseInstallation(credentialsfile=credentialsfile)
 		except SkipClientException:
 			logger.notice(u"Skipping host %s", hostId)
 			self.success = SKIP_MARKER
@@ -254,7 +254,7 @@ class LinuxDeployThread(DeployThread):
 						logger.debug2("Copying %s -> %s", local, remote)
 						ftpConnection.put(local, remote)
 
-	def _finaliseInstallation(self, nonrootExecution=False):
+	def _finaliseInstallation(self, credentialsfile=None):
 		if self.reboot:
 			logger.notice(u"Rebooting machine %s", self.networkAddress)
 			command = "shutdown -r 1 & disown"
@@ -272,7 +272,7 @@ class LinuxDeployThread(DeployThread):
 		elif self.startService:
 			logger.notice("Restarting opsiclientd service on computer: %s", self.networkAddress)
 			command = "service opsiclientd restart"
-			if nonrootExecution:
+			if credentialsfile:
 				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
 				self._executeViaSSH(command)
