@@ -13,6 +13,7 @@ build:linux-pyinstaller:
   stage: build
   script:
     - *get-opsi-server
+    - ls -lah /etc/opsi/backend*
     - apt -y install curl
     - curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3
     - source $HOME/.poetry/env
