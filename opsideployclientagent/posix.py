@@ -257,21 +257,31 @@ class LinuxDeployThread(DeployThread):
 	def _finaliseInstallation(self):
 		if self.reboot:
 			logger.notice(u"Rebooting machine %s", self.networkAddress)
+			command = "shutdown -r 1 & disown"
+			if nonrootExecution:
+				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
-				self._executeViaSSH("shutdown -r 1 & disown")
+				self._executeViaSSH(command)
 			except Exception as error:
 				logger.error(u"Failed to reboot computer: %s", error)
 		elif self.shutdown:
 			logger.notice(u"Shutting down machine %s", self.networkAddress)
+			command = "shutdown -h 1 & disown"
+			if nonrootExecution:
+				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
-				self._executeViaSSH("shutdown -h 1 & disown")
+				self._executeViaSSH(command)
 			except Exception as error:
 				logger.error(u"Failed to shutdown computer: %s", error)
 		elif self.startService:
+			logger.notice("Restarting opsiclientd service on computer: %s", self.networkAddress)
+			command = "service opsiclientd restart"
+			if nonrootExecution:
+				command = f"sudo --stdin -- {command} < {credentialsfile}"
 			try:
-				self._executeViaSSH("service opsiclientd restart")
+				self._executeViaSSH(command)
 			except Exception as error:
-				logger.error("Failed to restart opsiclientd on %s: %s", self.networkAddress, error)
+				logger.error("Failed to restart service opsiclientd on computer: %s", self.networkAddress)
 
 	def _setOpsiClientAgentToInstalled(self, hostId):
 		poc = ProductOnClient(
