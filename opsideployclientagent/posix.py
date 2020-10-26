@@ -116,8 +116,12 @@ class LinuxDeployThread(DeployThread):
 				logger.debug("Testing if folder was created...")
 				self._executeViaSSH("test -d /etc/opsi-client-agent/")
 				logger.debug("Testing if config can be found...")
-				# This call is executed with sudo, because etc/opsi-client-agent belongs to root:root
-				self._executeViaSSH("sudo test -e /etc/opsi-client-agent/opsiclientd.conf")
+				checkCommand = "test -e /etc/opsi-client-agent/opsiclientd.conf"
+				if nonrootExecution:
+					# This call is executed with sudo, because etc/opsi-client-agent belongs to root:root
+					checkCommand = "sudo --stdin -- {command} < {credfile}".format(command=checkCommand, credfile=credentialsfile)
+				self._executeViaSSH(checkCommand)
+
 				logger.debug("Testing if executable was found...")
 				self._executeViaSSH("test -e /usr/bin/opsiclientd -o -e /usr/bin/opsi-script-nogui")
 			finally:
