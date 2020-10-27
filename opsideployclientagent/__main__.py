@@ -28,21 +28,17 @@ installed via opsi.
 :author: Niko Wenselowski <n.wenselowski@uib.de>
 :license: GNU Affero General Public License version 3
 """
-
-import argparse
-import getpass
 import os
 import sys
-import time
+import argparse
 
-from OPSI.Backend.BackendManager import BackendManager
-from OPSI.System import which
-from OPSI.Types import forceUnicode, forceUnicodeLower
+from OPSI import __version__ as python_opsi_version
+
+from opsicommon.deployment.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
+from opsicommon.deployment.common import logger, LOG_WARNING
+from opsicommon.deployment import deploy_client_agent
 
 from . import __version__
-from .posix import LinuxDeployThread, paramiko, AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
-from .windows import WindowsDeployThread
-from .common import logger, SKIP_MARKER, LOG_WARNING, LOG_ERROR, LOG_DEBUG
 
 def initialize():
 	logger.setConsoleColor(True)
@@ -63,7 +59,6 @@ def initialize():
 	# name we assume that we want to deploy the opsi-linux-client-agent.
 	return ('opsi-linux-client-agent' in workdir)
 
-
 def parse_args(deployLinux):
 	scriptDescription = u"Deploy opsi client agent to the specified clients."
 	if deployLinux:
@@ -82,7 +77,7 @@ def parse_args(deployLinux):
 		defaultUser = u"Administrator"
 
 	parser = argparse.ArgumentParser(description=scriptDescription)
-	parser.add_argument('--version', '-V', action='version', version=__version__)
+	parser.add_argument('--version', '-V', action='version', version=f"{__version__} [python-opsi={python_opsi_version}]")
 	parser.add_argument('--verbose', '-v',
 						dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
@@ -183,184 +178,42 @@ def parse_args(deployLinux):
 						help=u'The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args()
-
 	return args
 
 def main():
 	deployLinux = initialize()
 	args = parse_args(deployLinux)
 
-	logger.setConsoleLevel(args.logLevel)
-
-	if args.debugFile:
-		logger.setLogFile(args.debugFile)
-		logger.setFileLevel(LOG_DEBUG)
-
-	if deployLinux and paramiko is None:
-		message = (
-			u"Could not import 'paramiko'. "
-			u"Deploying to Linux not possible. "
-			u"Please install paramiko through your package manager or pip."
-		)
-		logger.critical(message)
-		raise Exception(message)
-
-	additionalHostInfos = {}
-	hosts = args.host
-	if args.hostFile:
-		with open(args.hostFile) as inputFile:
-			for line in inputFile:
-				line = line.strip()
-				if not line or line.startswith('#') or line.startswith(';'):
-					continue
-
-				try:
-					host, description = line.split(None, 1)
-					additionalHostInfos[host] = {"description": description}
-				except ValueError as error:
-					logger.debug("Splitting line '%s' failed: %s", line, error)
-					host = line
-
-				hosts.append(forceUnicodeLower(host))
-
-	if not hosts:
-		raise Exception("No hosts given.")
-
-	logger.debug('Deploying to the following hosts: %s', hosts)
-
-	password = args.password
-	if not password:
-		print("Password is required for deployment.")
-		password = forceUnicode(getpass.getpass())
-		if not password:
-			raise Exception("No password given.")
-
-	for character in (u'$', u'§'):
-		if character in password:
-			logger.warning(
-				u"Please be aware that special characters in passwords may result"
-				u"in incorrect behaviour."
-			)
-			break
-	logger.addConfidentialString(password)
-
-	maxThreads = int(args.maxThreads)
-	if maxThreads < 1:
-		maxThreads = 1
-
-	if args.useIPAddress:
-		deploymentMethod = "ip"
-	elif args.useNetbios:
-		deploymentMethod = "hostname"
-	elif args.useFQDN:
-		deploymentMethod = "fqdn"
-	else:
-		deploymentMethod = "auto"
-
-	if not deployLinux:
-		logger.info("Deploying to Windows.")
-		deploymentClass = WindowsDeployThread
+	sshHostkeyPolicy = None
+	if hasattr(args, "sshHostkeyPolicy"):
+		sshHostkeyPolicy = args.sshHostkeyPolicy
+	mountWithSmbclient = None
+	if hasattr(args, "mountWithSmbclient"):
 		mountWithSmbclient = args.mountWithSmbclient
 
-		if mountWithSmbclient:
-			logger.debug('Explicit check for smbclient.')
-			try:
-				which('smbclient')
-			except Exception as error:
-				raise Exception(
-					"Please make sure that 'smbclient' is installed: "
-					"{0}".format(error)
-				)
-		else:
-			if os.getuid() != 0:
-				raise Exception("You have to be root to use mount.")
-	else:
-		logger.info("Deploying to Linux.")
-		deploymentClass = LinuxDeployThread
-		mountWithSmbclient = False
-
-	# Create BackendManager
-	backend = BackendManager(
-		dispatchConfigFile=u'/etc/opsi/backendManager/dispatch.conf',
-		backendConfigDir=u'/etc/opsi/backends',
-		extend=True,
-		depotbackend=False,
-		hostControlBackend=False
+	deploy_client_agent(
+			args.host,
+			deployLinux,
+			logLevel=args.logLevel,
+			debugFile=args.debugFile,
+			hostFile=args.hostFile,
+			password=args.password,
+			maxThreads=args.maxThreads,
+			useIPAddress=args.useIPAddress,
+			useNetbios=args.useNetbios,
+			useFQDN=args.useFQDN,
+			mountWithSmbclient=mountWithSmbclient,
+			depot=args.depot,
+			group=args.group,
+			username=args.username,
+			shutdown=args.shutdown,
+			reboot=args.reboot,
+			startService=args.startService,
+			stopOnPingFailure=args.stopOnPingFailure,
+			skipExistingClient=args.skipExistingClient,
+			keepClientOnFailure=args.keepClientOnFailure,
+			sshHostkeyPolicy=sshHostkeyPolicy
 	)
-
-	if args.depot:
-		assert backend.config_getObjects(id='clientconfig.depot.id')
-		if not backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=args.depot):
-			raise ValueError("No depot with id {0!r} found!".format(args.depot))
-	if args.group and not backend.group_getObjects(id=args.group):
-		raise ValueError(u"Group {0} does not exist.".format(args.group))
-
-	total = 0
-	fails = 0
-	skips = 0
-
-	runningThreads = []
-	while hosts or runningThreads:
-		if hosts and len(runningThreads) < maxThreads:
-			# start new thread
-			host = hosts.pop()
-
-			clientConfig = {
-				"host": host,
-				"backend": backend,
-				"username": args.username,
-				"password": password,
-				"shutdown": args.shutdown,
-				"reboot": args.reboot,
-				"startService": args.startService,
-				"deploymentMethod": deploymentMethod,
-				"stopOnPingFailure": args.stopOnPingFailure,
-				"skipExistingClient": args.skipExistingClient,
-				"mountWithSmbclient": mountWithSmbclient,
-				"keepClientOnFailure": args.keepClientOnFailure,
-				"depot": args.depot,
-				"group": args.group,
-			}
-
-			try:
-				clientConfig['additionalClientSettings'] = additionalHostInfos[host]
-			except KeyError:
-				pass
-
-			if deployLinux:
-				clientConfig["sshPolicy"] = args.sshHostkeyPolicy or WARNING_POLICY
-
-			thread = deploymentClass(**clientConfig)
-			total += 1
-			thread.daemon = True
-			thread.start()
-			runningThreads.append(thread)
-			time.sleep(0.5)
-
-		newRunningThreads = []
-		for thread in runningThreads:
-			if thread.isAlive():
-				newRunningThreads.append(thread)
-			else:
-				if thread.success == SKIP_MARKER:
-					skips += 1
-				elif not thread.success:
-					fails += 1
-		runningThreads = newRunningThreads
-		time.sleep(1)
-	
-	success = total - fails - skips
-
-	logger.notice("%s/%s deployments successfully", success, total)
-	if skips:
-		logger.notice("%s/%s deployments skipped", skips, total)
-	if fails:
-		logger.warning("%s/%s deployments failed", fails, total)
-
-	if fails:
-		return 1
-	else:
-		return 0
 
 if __name__ == "__main__":
 	main()
