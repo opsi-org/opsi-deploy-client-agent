@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "opsideployclientagent"
+version = "4.2.0.0"
+description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
+homepage = "https://www.opsi.org"
+license = "AGPL-3.0"
+authors = ["uib GmbH <info@uib.de>"]
+maintainers = ["uib GmbH <info@uib.de>"]
+
+[[tool.poetry.source]]
+name = "uib"
+url = "http://pypi.uib.gmbh:8080/simple/"
+
+
+
+[tool.poetry.dependencies]
+python = "^3.7"
+python-opsi = "^4.2.0.0"
+paramiko = "^2.7.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+opsi-dev-tools = "^1.0.43"
+pyinstaller = "^4.0"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"

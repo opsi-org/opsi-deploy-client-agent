@@ -1,0 +1,37 @@
+pyinstaller-poetry:
+  one_file: yes
+  hidden_imports:
+    all:
+      - OPSI.Backend.DHCPD
+      - OPSI.Backend.File
+      - OPSI.Backend.HostControl
+      - OPSI.Backend.HostControlSafe
+      - OPSI.Backend.JSONRPC
+      - OPSI.Backend.MySQL
+      - OPSI.Backend.OpsiPXEConfd
+      - OPSI.Backend.Replicator
+      - OPSI.Backend.SQLite
+      - OPSI.Util.Ping
+      - OPSI.Util.WIM
+    windows: []
+    linux: []
+    darwin: []
+  extra_args:
+    darwin:
+      - --exclude-module
+      - tkinter
+  scripts:
+    - script: run-opsi-deploy-client-agent
+      binaries:
+        - opsi-deploy-client-agent
+  before_script:
+    linux: []
+    darwin: []
+    windows: []
+  data_files: []
+  dirname: opsideployclientagent
+  locale_install: []
+  after_script:
+    linux: []
+    darwin: []
+    windows: []
