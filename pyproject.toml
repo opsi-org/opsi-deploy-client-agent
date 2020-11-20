@@ -16,6 +16,7 @@ url = "http://pypi.uib.gmbh:8080/simple/"
 [tool.poetry.dependencies]
 python = "^3.7"
 python-opsi = "^4.2.0.0"
+#python-opsi = {path = "../python-opsi"}
 paramiko = "^2.7.2"
 
 [tool.poetry.dev-dependencies]
