@@ -33,10 +33,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
-dev = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface", "furo", "sphinx", "pre-commit"]
 docs = ["furo", "sphinx", "zope.interface"]
 tests = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface"]
 tests_no_zope = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six"]
+dev = ["coverage[toml] (>=5.0.2)", "hypothesis", "pympler", "pytest (>=4.3.0)", "six", "zope.interface", "furo", "sphinx", "pre-commit"]
 
 [package.source]
 type = "legacy"
@@ -52,8 +52,8 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-attrs = ">=19.2.0"
 six = "*"
+attrs = ">=19.2.0"
 
 [package.extras]
 visualize = ["graphviz (>0.5.1)", "Twisted (>=16.1.1)"]
@@ -72,12 +72,12 @@ optional = false
 python-versions = ">=3.6"
 
 [package.dependencies]
-cffi = ">=1.1"
 six = ">=1.4.1"
+cffi = ">=1.1"
 
 [package.extras]
-tests = ["pytest (>=3.2.1,!=3.3.0)"]
 typecheck = ["mypy"]
+tests = ["pytest (>=3.2.1,!=3.3.0)"]
 
 [package.source]
 type = "legacy"
@@ -96,8 +96,8 @@ python-versions = "*"
 soupsieve = {version = ">1.2", markers = "python_version >= \"3.0\""}
 
 [package.extras]
-html5lib = ["html5lib"]
 lxml = ["lxml"]
+html5lib = ["html5lib"]
 
 [package.source]
 type = "legacy"
@@ -229,15 +229,15 @@ optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 
 [package.dependencies]
-cffi = ">=1.8,<1.11.3 || >1.11.3"
 six = ">=1.4.1"
+cffi = ">=1.8,<1.11.3 || >1.11.3"
 
 [package.extras]
-docs = ["sphinx (>=1.6.5,!=1.8.0,!=3.1.0,!=3.1.1)", "sphinx-rtd-theme"]
-docstest = ["doc8", "pyenchant (>=1.6.11)", "twine (>=1.12.0)", "sphinxcontrib-spelling (>=4.0.1)"]
-pep8test = ["black", "flake8", "flake8-import-order", "pep8-naming"]
-ssh = ["bcrypt (>=3.1.5)"]
 test = ["pytest (>=3.6.0,!=3.9.0,!=3.9.1,!=3.9.2)", "pretend", "iso8601", "pytz", "hypothesis (>=1.11.4,!=3.79.2)"]
+pep8test = ["black", "flake8", "flake8-import-order", "pep8-naming"]
+docstest = ["doc8", "pyenchant (>=1.6.11)", "twine (>=1.12.0)", "sphinxcontrib-spelling (>=4.0.1)"]
+ssh = ["bcrypt (>=3.1.5)"]
+docs = ["sphinx (>=1.6.5,!=1.8.0,!=3.1.0,!=3.1.1)", "sphinx-rtd-theme"]
 
 [package.source]
 type = "legacy"
@@ -352,6 +352,24 @@ url = "http://pypi.uib.gmbh:8080/simple"
 reference = "uib"
 
 [[package]]
+name = "lz4"
+version = "3.1.1"
+description = "LZ4 Bindings for Python"
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.extras]
+docs = ["sphinx (>=1.6.0)", "sphinx-bootstrap-theme"]
+tests = ["pytest (!=3.3.0)", "psutil", "pytest-cov"]
+flake8 = ["flake8"]
+
+[package.source]
+type = "legacy"
+url = "http://pypi.uib.gmbh:8080/simple"
+reference = "uib"
+
+[[package]]
 name = "macholib"
 version = "1.14"
 description = "Mach-O header analysis and editing"
@@ -402,17 +420,17 @@ optional = false
 python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
-bs4 = ">=0.0.1,<0.0.2"
-colorlog = ">=4.1.0,<5.0.0"
-configargparse = ">=1.2.3,<2.0.0"
-pefile = ">=2019.4.18,<2020.0.0"
-pypi-simple = ">=0.6.0,<0.7.0"
-python-gettext = ">=4.0,<5.0"
 pyyaml = ">=5.3.1,<6.0.0"
+colorlog = ">=4.1.0,<5.0.0"
 rarfile = ">=4.0,<5.0"
-requests = ">=2.23.0,<3.0.0"
+bs4 = ">=0.0.1,<0.0.2"
 toml = ">=0.10.0,<0.11.0"
 virustotal3 = ">=1.0.8,<2.0.0"
+requests = ">=2.23.0,<3.0.0"
+pypi-simple = ">=0.6.0,<0.7.0"
+pefile = ">=2019.4.18,<2020.0.0"
+python-gettext = ">=4.0,<5.0"
+configargparse = ">=1.2.3,<2.0.0"
 
 [package.source]
 type = "legacy"
@@ -445,13 +463,13 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
+pynacl = ">=1.0.1"
 bcrypt = ">=3.1.3"
 cryptography = ">=2.5"
-pynacl = ">=1.0.1"
 
 [package.extras]
-all = ["pyasn1 (>=0.1.7)", "pynacl (>=1.0.1)", "bcrypt (>=3.1.3)", "invoke (>=1.3)", "gssapi (>=1.4.1)", "pywin32 (>=2.1.8)"]
 ed25519 = ["pynacl (>=1.0.1)", "bcrypt (>=3.1.3)"]
+all = ["pyasn1 (>=0.1.7)", "pynacl (>=1.0.1)", "bcrypt (>=3.1.3)", "invoke (>=1.3)", "gssapi (>=1.4.1)", "pywin32 (>=2.1.8)"]
 gssapi = ["pyasn1 (>=0.1.7)", "gssapi (>=1.4.1)", "pywin32 (>=2.1.8)"]
 invoke = ["invoke (>=1.3)"]
 
@@ -601,15 +619,15 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-altgraph = "*"
-macholib = {version = ">=1.8", markers = "sys_platform == \"darwin\""}
-pefile = {version = ">=2017.8.1", markers = "sys_platform == \"win32\""}
-pyinstaller-hooks-contrib = ">=2020.6"
 pywin32-ctypes = {version = ">=0.2.0", markers = "sys_platform == \"win32\""}
+pyinstaller-hooks-contrib = ">=2020.6"
+altgraph = "*"
+pefile = {version = ">=2017.8.1", markers = "sys_platform == \"win32\""}
+macholib = {version = ">=1.8", markers = "sys_platform == \"darwin\""}
 
 [package.extras]
-encryption = ["tinyaes (>=1.0.0)"]
 hook_testing = ["pytest (>=2.7.3)", "execnet (>=1.5.0)", "psutil"]
+encryption = ["tinyaes (>=1.0.0)"]
 
 [package.source]
 type = "legacy"
@@ -638,8 +656,8 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.dependencies]
-cffi = ">=1.4.1"
 six = "*"
+cffi = ">=1.4.1"
 
 [package.extras]
 docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
@@ -659,12 +677,12 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
-cryptography = ">=2.8"
 six = ">=1.5.2"
+cryptography = ">=2.8"
 
 [package.extras]
-docs = ["sphinx", "sphinx-rtd-theme"]
 test = ["flaky", "pretend", "pytest (>=3.0.1)"]
+docs = ["sphinx", "sphinx-rtd-theme"]
 
 [package.source]
 type = "legacy"
@@ -693,10 +711,10 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
 
 [package.dependencies]
-beautifulsoup4 = ">=4.5,<5.0"
 packaging = ">=16"
-requests = ">=2.5,<3.0"
+beautifulsoup4 = ">=4.5,<5.0"
 six = ">=1.4,<2.0"
+requests = ">=2.5,<3.0"
 
 [package.source]
 type = "legacy"
@@ -712,15 +730,15 @@ optional = false
 python-versions = ">=3.5"
 
 [package.dependencies]
-atomicwrites = {version = ">=1.0", markers = "sys_platform == \"win32\""}
-attrs = ">=17.4.0"
-colorama = {version = "*", markers = "sys_platform == \"win32\""}
-importlib-metadata = {version = ">=0.12", markers = "python_version < \"3.8\""}
 more-itertools = ">=4.0.0"
-packaging = "*"
-pluggy = ">=0.12,<1.0"
 py = ">=1.5.0"
 wcwidth = "*"
+packaging = "*"
+importlib-metadata = {version = ">=0.12", markers = "python_version < \"3.8\""}
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+attrs = ">=17.4.0"
+pluggy = ">=0.12,<1.0"
+atomicwrites = {version = ">=1.0", markers = "sys_platform == \"win32\""}
 
 [package.extras]
 checkqa-mypy = ["mypy (==v0.761)"]
@@ -746,28 +764,29 @@ reference = "uib"
 
 [[package]]
 name = "python-opsi"
-version = "4.2.0.97"
+version = "4.2.0.124"
 description = "The opsi python library"
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 
 [package.dependencies]
-colorlog = ">=4.2.1,<5.0.0"
-distro = {version = ">=1.5.0,<2.0.0", markers = "sys_platform == \"linux\""}
-ldap3 = ">=2.8.1,<3.0.0"
-mysqlclient = {version = ">=1.4.6,<2.0.0", markers = "sys_platform == \"linux\""}
-pefile = ">=2019.4.18,<2020.0.0"
-psutil = ">=5.7.0,<6.0.0"
-pyasn1 = ">=0.4.8,<0.5.0"
-pycryptodome = ">=3.9.7,<4.0.0"
-pyOpenSSL = ">=19.1.0,<20.0.0"
-python-pam = ">=1.8.4,<2.0.0"
-pywin32 = {version = ">=227,<228", markers = "sys_platform == \"win32\""}
-ruyaml = ">=0.19.2,<0.20.0"
 SQLAlchemy = ">=1.3.15,<2.0.0"
+colorlog = ">=4.2.1,<5.0.0"
+pyOpenSSL = ">=19.1.0,<20.0.0"
 twisted = {version = ">=20.3.0,<21.0.0", extras = ["tls"]}
+mysqlclient = {version = ">=1.4.6,<2.0.0", markers = "sys_platform == \"linux\""}
+lz4 = ">=3.1.1,<4.0.0"
+ldap3 = ">=2.8.1,<3.0.0"
+ruyaml = ">=0.19.2,<0.20.0"
+psutil = ">=5.7.0,<6.0.0"
 wmi = {version = ">=1.5.1,<2.0.0", markers = "sys_platform == \"win32\""}
+pywin32 = {version = ">=227,<228", markers = "sys_platform == \"win32\""}
+pycryptodome = ">=3.9.7,<4.0.0"
+pyasn1 = ">=0.4.8,<0.5.0"
+pefile = ">=2019.4.18,<2020.0.0"
+python-pam = ">=1.8.4,<2.0.0"
+distro = {version = ">=1.5.0,<2.0.0", markers = "sys_platform == \"linux\""}
 
 [package.source]
 type = "legacy"
@@ -848,9 +867,9 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.dependencies]
+idna = ">=2.5,<3"
 certifi = ">=2017.4.17"
 chardet = ">=3.0.2,<4"
-idna = ">=2.5,<3"
 urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
@@ -890,16 +909,16 @@ optional = false
 python-versions = "*"
 
 [package.dependencies]
+pyasn1-modules = "*"
+pyasn1 = "*"
 attrs = ">=16.0.0"
 cryptography = "*"
-pyasn1 = "*"
-pyasn1-modules = "*"
 
 [package.extras]
-dev = ["coverage (>=4.2.0)", "pytest", "sphinx", "idna", "pyopenssl"]
 docs = ["sphinx"]
-idna = ["idna"]
 tests = ["coverage (>=4.2.0)", "pytest"]
+idna = ["idna"]
+dev = ["coverage (>=4.2.0)", "pytest", "sphinx", "idna", "pyopenssl"]
 
 [package.source]
 type = "legacy"
@@ -941,16 +960,16 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [package.extras]
-mssql = ["pyodbc"]
-mssql_pymssql = ["pymssql"]
-mssql_pyodbc = ["pyodbc"]
-mysql = ["mysqlclient"]
-oracle = ["cx-oracle"]
-postgresql = ["psycopg2"]
 postgresql_pg8000 = ["pg8000"]
-postgresql_psycopg2binary = ["psycopg2-binary"]
+postgresql = ["psycopg2"]
 postgresql_psycopg2cffi = ["psycopg2cffi"]
 pymysql = ["pymysql"]
+mssql_pymssql = ["pymssql"]
+postgresql_psycopg2binary = ["psycopg2-binary"]
+mysql = ["mysqlclient"]
+oracle = ["cx-oracle"]
+mssql = ["pyodbc"]
+mssql_pyodbc = ["pyodbc"]
 
 [package.source]
 type = "legacy"
@@ -979,28 +998,28 @@ optional = false
 python-versions = ">=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*"
 
 [package.dependencies]
-attrs = ">=19.2.0"
-Automat = ">=0.3.0"
-constantly = ">=15.1"
 hyperlink = ">=17.1.1"
-idna = {version = ">=0.6,<2.3 || >2.3", optional = true, markers = "extra == \"tls\""}
-incremental = ">=16.10.1"
-PyHamcrest = ">=1.9.0,<1.10.0 || >1.10.0"
 pyopenssl = {version = ">=16.0.0", optional = true, markers = "extra == \"tls\""}
-service_identity = {version = ">=18.1.0", optional = true, markers = "extra == \"tls\""}
 "zope.interface" = ">=4.4.2"
+service_identity = {version = ">=18.1.0", optional = true, markers = "extra == \"tls\""}
+constantly = ">=15.1"
+PyHamcrest = ">=1.9.0,<1.10.0 || >1.10.0"
+Automat = ">=0.3.0"
+incremental = ">=16.10.1"
+attrs = ">=19.2.0"
+idna = {version = ">=0.6,<2.3 || >2.3", optional = true, markers = "extra == \"tls\""}
 
 [package.extras]
-all_non_platform = ["pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
-conch = ["pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)"]
-dev = ["pyflakes (>=1.0.0)", "twisted-dev-tools (>=0.0.2)", "python-subunit", "sphinx (>=1.3.1)", "towncrier (>=17.4.0)"]
-http2 = ["h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)"]
+tls = ["pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)"]
 macos_platform = ["pyobjc-core", "pyobjc-framework-cfnetwork", "pyobjc-framework-cocoa", "pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
+conch = ["pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)"]
+http2 = ["h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)"]
+dev = ["pyflakes (>=1.0.0)", "twisted-dev-tools (>=0.0.2)", "python-subunit", "sphinx (>=1.3.1)", "towncrier (>=17.4.0)"]
 osx_platform = ["pyobjc-core", "pyobjc-framework-cfnetwork", "pyobjc-framework-cocoa", "pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
+all_non_platform = ["pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
+windows_platform = ["pywin32 (!=226)", "pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
 serial = ["pyserial (>=3.0)", "pywin32 (!=226)"]
 soap = ["soappy"]
-tls = ["pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)"]
-windows_platform = ["pywin32 (!=226)", "pyopenssl (>=16.0.0)", "service_identity (>=18.1.0)", "idna (>=0.6,!=2.3)", "pyasn1", "cryptography (>=2.5)", "appdirs (>=1.4.0)", "bcrypt (>=3.0.0)", "soappy", "pyserial (>=3.0)", "h2 (>=3.0,<4.0)", "priority (>=1.1.0,<2.0)", "pywin32 (!=226)"]
 
 [package.source]
 type = "legacy"
@@ -1066,11 +1085,11 @@ python-versions = "*"
 pywin32 = "*"
 
 [package.extras]
-all = ["pytest", "wheel", "twine", "sphinx"]
-dev = ["pytest", "sphinx", "wheel", "twine"]
 docs = ["sphinx"]
-package = ["wheel", "twine"]
+all = ["pytest", "wheel", "twine", "sphinx"]
 tests = ["pytest"]
+dev = ["pytest", "sphinx", "wheel", "twine"]
+package = ["wheel", "twine"]
 
 [package.source]
 type = "legacy"
@@ -1103,8 +1122,8 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [package.extras]
-docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
+docs = ["sphinx", "repoze.sphinx.autointerface"]
 testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 
 [package.source]
@@ -1263,6 +1282,37 @@ ldap3 = [
     {file = "ldap3-2.8.1-py2.py3-none-any.whl", hash = "sha256:7c3738570766f5e5e74a56fade15470f339d5c436d821cf476ef27da0a4de8b0"},
     {file = "ldap3-2.8.1.tar.gz", hash = "sha256:37d633e20fa360c302b1263c96fe932d40622d0119f1bddcb829b03462eeeeb7"},
 ]
+lz4 = [
+    {file = "lz4-3.1.1-cp35-cp35m-macosx_10_6_intel.whl", hash = "sha256:9357141371bb234b4a4c477f0a5b4acd910eca58919210fdadf450ef2333140a"},
+    {file = "lz4-3.1.1-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:194dde84e58bb4ea4d6ae2fa043e44e60424a4918d940599431fe538c73a898f"},
+    {file = "lz4-3.1.1-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:5b8d9e1340a13e57b24e144290511ce7eea74c1e5ef46f80af9f69f7e9b37fae"},
+    {file = "lz4-3.1.1-cp35-cp35m-manylinux2010_i686.whl", hash = "sha256:a0ac8aa58c508bb00d200fb097bc70b3eb578b692073196b1da555666ef840b9"},
+    {file = "lz4-3.1.1-cp35-cp35m-manylinux2010_x86_64.whl", hash = "sha256:f317fc6f0dd8b41beb2d3e67f3a2486a500e9017a89e5b64f4f9b780f888b3db"},
+    {file = "lz4-3.1.1-cp35-cp35m-win32.whl", hash = "sha256:2a8fb5ee5a0c603041fefb71550ca901292cf21ffca5b8a58bbc4c62f4bf69d1"},
+    {file = "lz4-3.1.1-cp35-cp35m-win_amd64.whl", hash = "sha256:e3b477ece832109855929f15f8626d1ab9201d38c7f078bafd445aee00232158"},
+    {file = "lz4-3.1.1-cp36-cp36m-macosx_10_6_intel.whl", hash = "sha256:4686f9be6c910f2f91fc4ae91b2d61d3c33980cc21a084a87c373b96591035f2"},
+    {file = "lz4-3.1.1-cp36-cp36m-manylinux1_i686.whl", hash = "sha256:10ce932782cbe0bb6ec3cedfd0fc703e883bddcd795856d8afdcb7190249ca85"},
+    {file = "lz4-3.1.1-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:4d701b94879561b17b241066e3a4353dcbdfc65c9af3b961497957b9e6cef54a"},
+    {file = "lz4-3.1.1-cp36-cp36m-manylinux2010_i686.whl", hash = "sha256:6f7b7b9706c1c7ef7237411b1d7170d51351e60b887c65ad6eb4d1bd606bc1f2"},
+    {file = "lz4-3.1.1-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:d250af6ca0635fd1bc90d9038eaf0caddc8907f2e2380953f2c10788583d0655"},
+    {file = "lz4-3.1.1-cp36-cp36m-win32.whl", hash = "sha256:a2f080c64966e00e7d669d56d31aa1944afa61bed10a7708484bb1af0b51fdde"},
+    {file = "lz4-3.1.1-cp36-cp36m-win_amd64.whl", hash = "sha256:490ac5b2b4ef168cee6d123c54e6993d8f2c4e337ecf7cefe768b52a9578fc9a"},
+    {file = "lz4-3.1.1-cp37-cp37m-macosx_10_6_intel.whl", hash = "sha256:d70ae984663e511ba64cfb6c54a920c44ecdce58e84e75ee1fea69dd3c367da3"},
+    {file = "lz4-3.1.1-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:27f42cb2df6e14b20b2372b9eaf6cc3f3ec93923243d4fba3716e8678ce9dbd5"},
+    {file = "lz4-3.1.1-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:6d345a8fca48ca43575605ea439c48f29fa13654178e434f174733b37878184f"},
+    {file = "lz4-3.1.1-cp37-cp37m-manylinux2010_i686.whl", hash = "sha256:5143463a9d103c5917bde06a1d44b53eea9b4f74aa3a5741208fa03a59bd099f"},
+    {file = "lz4-3.1.1-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:4aff99678c4255408e3546c45b918830616a80ba2b009a013bd442be08d08cc4"},
+    {file = "lz4-3.1.1-cp37-cp37m-win32.whl", hash = "sha256:42efc263bdc71352df47727cead220c2af0b9dc67acf34836488018159c39af9"},
+    {file = "lz4-3.1.1-cp37-cp37m-win_amd64.whl", hash = "sha256:769fb9983a808beadf67ed5a9da8cefa1347e7dcb2ac61236f7828797a7b5e8f"},
+    {file = "lz4-3.1.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:273b87db52f8ee0ec2d58204c4dd564f8aa59867319543d12af4feb8ce92a3bc"},
+    {file = "lz4-3.1.1-cp38-cp38-manylinux1_i686.whl", hash = "sha256:8aab2d7ff9ca67e4e7288f05c15310beff3b1b4f2ad14419f58f05c6f9b38860"},
+    {file = "lz4-3.1.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:fe5d1a8943e29800cec8c12732553dd2bba3c7ef8e96aa7c85a0253cf93e25a1"},
+    {file = "lz4-3.1.1-cp38-cp38-manylinux2010_i686.whl", hash = "sha256:3205dc27bbc4e85961727a4de129b6e52b0cc45bc9de3f91181343a2960a117c"},
+    {file = "lz4-3.1.1-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:65ba0471437c37c976082eb078d0c9fb869f78ebd3c9e03d76a790313c9377fb"},
+    {file = "lz4-3.1.1-cp38-cp38-win32.whl", hash = "sha256:44aae2a2d0df97af76faeecc00af7e5ce387ea12ea2654db886b99705ae8d76a"},
+    {file = "lz4-3.1.1-cp38-cp38-win_amd64.whl", hash = "sha256:f846ad0671a60602d87918043561619b6a735d468170137ae675274ed05cb8fb"},
+    {file = "lz4-3.1.1.tar.gz", hash = "sha256:1ac354804cb2d5fb3d213857a6bf8590a301ef051cc16fbb4938bd2d6e524bda"},
+]
 macholib = [
     {file = "macholib-1.14-py2.py3-none-any.whl", hash = "sha256:c500f02867515e6c60a27875b408920d18332ddf96b4035ef03beddd782d4281"},
     {file = "macholib-1.14.tar.gz", hash = "sha256:0c436bc847e7b1d9bda0560351bf76d7caf930fb585a828d13608839ef42c432"},
@@ -1413,8 +1463,8 @@ python-gettext = [
     {file = "python-gettext-4.0.tar.gz", hash = "sha256:626b501a51ac892fc3460cf550e60dca121f544eaa46eb69c90ce4682fc7ec02"},
 ]
 python-opsi = [
-    {file = "python-opsi-4.2.0.97.tar.gz", hash = "md5:1d86eefe566b927939f4bb7900a10927"},
-    {file = "python_opsi-4.2.0.97-py3-none-any.whl", hash = "md5:cc76a7f021516b3ea59a4bc9976dfa51"},
+    {file = "python-opsi-4.2.0.124.tar.gz", hash = "md5:f679d30a2cfb09a1723c1807cf33ef94"},
+    {file = "python_opsi-4.2.0.124-py3-none-any.whl", hash = "md5:fa864c2356afc88e8ed33a9861699b11"},
 ]
 python-pam = [
     {file = "python-pam-1.8.4.tar.gz", hash = "sha256:c856d9c89fedb33951dd8a95727ae57c6887b02d065bbdffd2fd9dbc0183909b"},
