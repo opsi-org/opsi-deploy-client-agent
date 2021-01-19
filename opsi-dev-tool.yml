@@ -17,11 +17,6 @@ pyinstaller-poetry:
     linux: []
     darwin: []
   extra_args:
-    linux:
-      - --exclude
-      - tcl
-      - --exclude
-      - tk
     darwin:
       - --exclude-module
       - tkinter
