@@ -35,24 +35,21 @@ import argparse
 from OPSI import __version__ as python_opsi_version
 
 from opsicommon.deployment.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
-from opsicommon.deployment.common import logger, LOG_WARNING
+from opsicommon.deployment.common import logger, logging_config
 from opsicommon.deployment import deploy_client_agent
+from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
 from . import __version__
 
 def initialize():
-	logger.setConsoleColor(True)
-
 	if getattr(sys, 'frozen', False):
-		workdir = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+		workdir = os.path.dirname(os.path.abspath(sys.executable))	# for running as executable
 	else:
 		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
 	try:
 		os.chdir(workdir)
 	except Exception as error:
-		logger.setConsoleLevel(LOG_ERROR)
-		logger.logException(error)
-		print(u"ERROR: {0}".format(forceUnicode(error)), file=sys.stderr)
+		logger.error(error, exc_info=True)
 		raise error
 
 	# If we are inside a folder with 'opsi-linux-client-agent' in it's
@@ -60,21 +57,21 @@ def initialize():
 	return ('opsi-linux-client-agent' in workdir)
 
 def parse_args(deployLinux):
-	scriptDescription = u"Deploy opsi client agent to the specified clients."
+	scriptDescription = "Deploy opsi client agent to the specified clients."
 	if deployLinux:
 		scriptDescription = '\n'.join((
 			scriptDescription,
-			u"The clients must be accessible via SSH.",
-			u"The user must be allowed to use sudo non-interactive.",
+			"The clients must be accessible via SSH.",
+			"The user must be allowed to use sudo non-interactive.",
 		))
-		defaultUser = u"root"
+		defaultUser = "root"
 	else:
 		scriptDescription = '\n'.join((
 			scriptDescription,
-			u"The c$ and admin$ must be accessible on every client.",
-			u"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
+			"The c$ and admin$ must be accessible on every client.",
+			"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
 		))
-		defaultUser = u"Administrator"
+		defaultUser = "Administrator"
 
 	parser = argparse.ArgumentParser(description=scriptDescription)
 	parser.add_argument('--version', '-V', action='version', version=f"{__version__} [python-opsi={python_opsi_version}]")
@@ -84,69 +81,66 @@ def parse_args(deployLinux):
 	parser.add_argument('--debug-file', dest='debugFile',
 						help='Write debug output to given file.')
 	parser.add_argument('--username', '-u', dest="username", default=defaultUser,
-						help=(
-							u'username for authentication (default: {0}).\n'
-							u"Example for a domain account: -u \"<DOMAIN>\\\\<username>\""
-							).format(defaultUser)
+						help=f'username for authentication (default: {defaultUser}).' + r"Example for a domain account: -u \"<DOMAIN>\\\\<username>\""
 						)
-	parser.add_argument('--password', '-p', dest="password", default=u"",
-						help=u"password for authentication")
+	parser.add_argument('--password', '-p', dest="password", default="",
+						help="password for authentication")
 	networkAccessGroup = parser.add_mutually_exclusive_group()
 	networkAccessGroup.add_argument('--use-fqdn', '-c', dest="useFQDN",
 									action="store_true",
-									help=u"Use FQDN to connect to client.")
+									help="Use FQDN to connect to client.")
 	networkAccessGroup.add_argument('--use-hostname', dest="useNetbios",
 									action="store_true",
-									help=u"Use hostname to connect to client.")
+									help="Use hostname to connect to client.")
 	networkAccessGroup.add_argument('--use-ip-address', dest="useIPAddress",
 									action='store_true',
 									help="Use IP address to connect to client.")
 	parser.add_argument('--ignore-failed-ping', '-x',
 						dest="stopOnPingFailure", default=True,
 						action="store_false",
-						help=u"try installation even if ping fails")
+						help="try installation even if ping fails")
 	if deployLinux:
 		sshPolicyGroup = parser.add_mutually_exclusive_group()
 		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
 									const=AUTO_ADD_POLICY, action="store_const",
-									help=u"Automatically add unknown SSH hostkeys.")
+									help="Automatically add unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-reject', dest="sshHostkeyPolicy",
 									const=REJECT_POLICY, action="store_const",
-									help=u"Reject unknown SSH hostkeys.")
+									help="Reject unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-warn', dest="sshHostkeyPolicy",
 									const=WARNING_POLICY, action="store_const",
-									help=u"Warn when encountering unknown SSH hostkeys. (Default)")
+									help="Warn when encountering unknown SSH hostkeys. (Default)")
 
 	postInstallationAction = parser.add_mutually_exclusive_group()
 	postInstallationAction.add_argument('--reboot', '-r',
 										dest="reboot", default=False,
 										action="store_true",
-										help=u"reboot computer after installation")
+										help="reboot computer after installation")
 	postInstallationAction.add_argument('--shutdown', '-s',
 										dest="shutdown", default=False,
 										action="store_true",
-										help=u"shutdown computer after installation")
+										help="shutdown computer after installation")
 	postInstallationAction.add_argument('--start-opsiclientd', '-o',
 										dest="startService", default=True,
 										action="store_true",
-										help=u"Start opsiclientd service after installation (default).")
+										help="Start opsiclientd service after installation (default).")
 	postInstallationAction.add_argument('--no-start-opsiclientd',
 										dest="startService",
 										action="store_false",
-										help=u"Do not start opsiclientd service after installation.")
+										help="Do not start opsiclientd service after installation.")
 	parser.add_argument('--hosts-from-file', '-f',
 						dest="hostFile", default=None,
 						help=(
-							u"File containing addresses of hosts (one per line)."
-							u"If there is a space followed by text after the "
-							u"address this will be used as client description "
-							u"for new clients."))
+							"File containing addresses of hosts (one per line)."
+							"If there is a space followed by text after the "
+							"address this will be used as client description "
+							"for new clients."))
 	parser.add_argument('--skip-existing-clients', '-S',
 						dest="skipExistingClient", default=False,
-						action="store_true", help=u"skip known opsi clients")
+						action="store_true", help="skip known opsi clients")
 	parser.add_argument('--threads', '-t', dest="maxThreads", default=1,
 						type=int,
-						help=u"number of concurrent deployment threads")
+						help="number of concurrent deployment threads")
 	parser.add_argument('--depot', help="Assign new clients to the given depot.")
 	parser.add_argument('--group', dest="group",
 						help="Assign fresh clients to an already existing group.")
@@ -155,29 +149,30 @@ def parse_args(deployLinux):
 		mountGroup = parser.add_mutually_exclusive_group()
 		mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
 								default=True, action="store_true",
-								help=u"Mount the client's C$-share via smbclient.")
+								help="Mount the client's C$-share via smbclient.")
 		mountGroup.add_argument('--mount', dest="mountWithSmbclient",
 								action="store_false",
-								help=u"Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
+								help="Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
 
 	clientRemovalGroup = parser.add_mutually_exclusive_group()
 	clientRemovalGroup.add_argument('--keep-client-on-failure',
 									dest="keepClientOnFailure",
 									default=True, action="store_true",
-									help=(u"If the client was created in opsi "
-											u"through this script it will not "
-											u"be removed in case of failure."
-											u" (DEFAULT)"))
+									help=("If the client was created in opsi "
+											"through this script it will not "
+											"be removed in case of failure."
+											" (DEFAULT)"))
 	clientRemovalGroup.add_argument('--remove-client-on-failure',
 									dest="keepClientOnFailure",
 									action="store_false",
-									help=(u"If the client was created in opsi "
-											u"through this script it will be "
-											u"removed in case of failure."))
+									help=("If the client was created in opsi "
+											"through this script it will be "
+											"removed in case of failure."))
 	parser.add_argument('host', nargs='*',
-						help=u'The hosts to deploy the opsi-client-agent to.')
+						help='The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args()
+	logging_config(stderr_level=args.logLevel, stderr_format=DEFAULT_COLORED_FORMAT, log_file=args.debugFile)
 	return args
 
 def main():
