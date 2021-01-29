@@ -39,9 +39,9 @@ from opsicommon.deployment.common import logger, logging_config
 from opsicommon.deployment import deploy_client_agent
 from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
-from . import __version__
+from opsideployclientagent import __version__
 
-def initialize():
+def get_target_os():
 	if getattr(sys, 'frozen', False):
 		workdir = os.path.dirname(os.path.abspath(sys.executable))	# for running as executable
 	else:
@@ -54,11 +54,15 @@ def initialize():
 
 	# If we are inside a folder with 'opsi-linux-client-agent' in it's
 	# name we assume that we want to deploy the opsi-linux-client-agent.
-	return ('opsi-linux-client-agent' in workdir)
+	if 'opsi-linux-client-agent' in workdir:
+		return "linux"
+	if 'opsi-mac-client-agent' in workdir:
+		return "macos"
+	return "windows"
 
-def parse_args(deployLinux):
+def parse_args(target_os):
 	scriptDescription = "Deploy opsi client agent to the specified clients."
-	if deployLinux:
+	if target_os in ("linux", "macos"):
 		scriptDescription = '\n'.join((
 			scriptDescription,
 			"The clients must be accessible via SSH.",
@@ -99,7 +103,7 @@ def parse_args(deployLinux):
 						dest="stopOnPingFailure", default=True,
 						action="store_false",
 						help="try installation even if ping fails")
-	if deployLinux:
+	if target_os in ("linux", "macos"):
 		sshPolicyGroup = parser.add_mutually_exclusive_group()
 		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
 									const=AUTO_ADD_POLICY, action="store_const",
@@ -145,7 +149,7 @@ def parse_args(deployLinux):
 	parser.add_argument('--group', dest="group",
 						help="Assign fresh clients to an already existing group.")
 
-	if not deployLinux:
+	if not target_os in ("linux", "macos"):
 		mountGroup = parser.add_mutually_exclusive_group()
 		mountGroup.add_argument('--smbclient', dest="mountWithSmbclient",
 								default=True, action="store_true",
@@ -176,8 +180,8 @@ def parse_args(deployLinux):
 	return args
 
 def main():
-	deployLinux = initialize()
-	args = parse_args(deployLinux)
+	target_os = get_target_os()
+	args = parse_args(target_os)
 
 	sshHostkeyPolicy = None
 	if hasattr(args, "sshHostkeyPolicy"):
@@ -188,7 +192,7 @@ def main():
 
 	deploy_client_agent(
 			args.host,
-			deployLinux,
+			target_os,
 			logLevel=args.logLevel,
 			debugFile=args.debugFile,
 			hostFile=args.hostFile,
