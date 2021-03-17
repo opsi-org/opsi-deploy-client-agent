@@ -14,8 +14,10 @@ pyinstaller-poetry:
       - OPSI.Util.Ping
       - OPSI.Util.WIM
     windows: []
-    linux: []
-    darwin: []
+    linux:
+      - paramiko
+    darwin:
+      - paramiko
   extra_args:
     darwin:
       - --exclude-module
