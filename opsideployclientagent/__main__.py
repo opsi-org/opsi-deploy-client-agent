@@ -190,7 +190,7 @@ def main():
 	if hasattr(args, "mountWithSmbclient"):
 		mountWithSmbclient = args.mountWithSmbclient
 
-	deploy_client_agent(
+	returncode = deploy_client_agent(
 			args.host,
 			target_os,
 			logLevel=args.logLevel,
@@ -213,6 +213,7 @@ def main():
 			keepClientOnFailure=args.keepClientOnFailure,
 			sshHostkeyPolicy=sshHostkeyPolicy
 	)
+	sys.exit(returncode)
 
 if __name__ == "__main__":
 	main()
