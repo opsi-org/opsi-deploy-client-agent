@@ -35,8 +35,8 @@ import argparse
 from OPSI import __version__ as python_opsi_version
 
 from opsicommon.deployment.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
-from opsicommon.deployment.common import logger, logging_config
 from opsicommon.deployment import deploy_client_agent
+from opsicommon.logging import logging_config, logger
 from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
 from opsideployclientagent import __version__
@@ -189,6 +189,9 @@ def main():
 	mountWithSmbclient = None
 	if hasattr(args, "mountWithSmbclient"):
 		mountWithSmbclient = args.mountWithSmbclient
+
+	if not args.startService:
+		logger.warning("The option --no-start-opsiclientd is deprecated - ignoring.")
 
 	returncode = deploy_client_agent(
 			args.host,
