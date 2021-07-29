@@ -85,7 +85,7 @@ def parse_args(target_os):
 	parser.add_argument('--debug-file', dest='debugFile',
 						help='Write debug output to given file.')
 	parser.add_argument('--username', '-u', dest="username", default=defaultUser,
-						help=f'username for authentication (default: {defaultUser}).' + r"Example for a domain account: -u \"<DOMAIN>\\\\<username>\""
+						help=f'username for authentication (default: {defaultUser}).' + r'Example for a domain account: -u <DOMAIN>\\<username>'
 						)
 	parser.add_argument('--password', '-p', dest="password", default="",
 						help="password for authentication")
