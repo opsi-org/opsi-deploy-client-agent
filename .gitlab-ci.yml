@@ -1,6 +1,7 @@
 image: docker.uib.gmbh/opsi/dev/pybuilder:latest
 
 stages:
+  - test
   - build
 
 .get-opsi-server: &get-opsi-server |
@@ -8,12 +9,18 @@ stages:
   GIT_TERMINAL_PROMPT=0 git clone $url
   cp -a opsi-server/opsi-server_data/etc /etc/opsi
 
+test:pytest-pylint:
+  stage: test
+  script:
+    - poetry install
+    - poetry run pylint --disable=R,C,fixme opsideployclientagent
+
 build:linux-pyinstaller:
   stage: build
   script:
     - *get-opsi-server
     - poetry install
-    - poetry run pylint --disable=R,C,fixme
+    - poetry run pylint --disable=R,C,fixme opsideployclientagent
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
     - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
