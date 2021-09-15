@@ -34,12 +34,12 @@ import argparse
 
 from OPSI import __version__ as python_opsi_version
 
-from opsicommon.deployment.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
-from opsicommon.deployment import deploy_client_agent
 from opsicommon.logging import logging_config, logger
 from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
-from opsideployclientagent import __version__
+from opsideployclientagent.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
+from opsideployclientagent import deploy_client_agent, __version__
+
 
 def get_target_os():
 	if getattr(sys, 'frozen', False):
@@ -156,7 +156,9 @@ def parse_args(target_os):
 								help="Mount the client's C$-share via smbclient.")
 		mountGroup.add_argument('--mount', dest="mountWithSmbclient",
 								action="store_false",
-								help="Mount the client's C$-share via normal mount on the server for copying the files. This imitates the behaviour of the 'old' script.")
+								help=("Mount the client's C$-share via normal mount on the server for copying the files."
+								"This imitates the behaviour of the 'old' script.")
+								)
 
 	clientRemovalGroup = parser.add_mutually_exclusive_group()
 	clientRemovalGroup.add_argument('--keep-client-on-failure',

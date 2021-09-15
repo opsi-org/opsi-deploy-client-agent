@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "opsideployclientagent"
-version = "4.2.0.14"
+name = "opsi-deploy-client-agent"
+version = "4.2.0.15"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 homepage = "https://www.opsi.org"
 license = "AGPL-3.0"
@@ -9,7 +9,7 @@ maintainers = ["uib GmbH <info@uib.de>"]
 
 [[tool.poetry.source]]
 name = "uib"
-url = "http://pypi.uib.gmbh:8080/simple/"
+url = "https://pypi.uib.gmbh/simple/"
 
 
 
