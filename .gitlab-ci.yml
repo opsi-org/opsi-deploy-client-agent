@@ -20,7 +20,6 @@ build:linux-pyinstaller:
   script:
     - *get-opsi-server
     - poetry install
-    - poetry run pylint --disable=R,C,fixme opsideployclientagent
     - poetry run opsi-dev-tool -l info --pyinstaller-poetry-build
     - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
