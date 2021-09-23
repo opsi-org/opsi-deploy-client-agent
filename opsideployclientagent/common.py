@@ -17,11 +17,39 @@ import subprocess
 
 from OPSI.System import execute, getFQDN
 from OPSI.Object import OpsiClient, ProductOnClient
-from OPSI.Types import forceHostId, forceIPAddress, forceUnicodeLower
+from OPSI.Types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import logger
 
 
 SKIP_MARKER = 'clientskipped'
+
+def _get_id_from_hostname(host, host_ip=None):
+	host = host.replace('_', '-')
+
+	if host.count('.') < 2:
+		hostBefore = host
+		try:
+			host = socket.getfqdn(socket.gethostbyname(host))
+
+			try:
+				if host_ip == forceIPAddress(host):  # Lookup did not succeed
+					# Falling back to hopefully valid hostname
+					host = hostBefore
+			except ValueError:
+				pass  # no IP - great!
+			except NameError:
+				pass  # no deployment via IP
+		except socket.gaierror:
+			logger.debug("Lookup of %s failed.", host)
+
+	logger.debug("Host is now: %s", host)
+	if host.count('.') < 2:
+		hostId = forceHostId(f'{host}.{".".join(getFQDN().split(".")[1:])}')
+	else:
+		hostId = forceHostId(host)
+
+	logger.info("Got hostId %s", hostId)
+	return hostId
 
 class SkipClientException(Exception):
 	pass
@@ -82,46 +110,21 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self.deploymentMethod = "fqdn"
 
 	def _getHostId(self, host):
-		ip = None
+		host_ip = None
 		if self.deploymentMethod == 'ip':
-			ip = forceIPAddress(host)
+			host_ip = forceIPAddress(host)
 			try:
-				(hostname, _, _) = socket.gethostbyaddr(ip)
+				(hostname, _, _) = socket.gethostbyaddr(host_ip)
 				host = hostname
 			except socket.herror as error:
-				logger.debug("Lookup for %s failed: %s", ip, error)
-				logger.warning("Could not get a hostname for %s. This is needed to create a FQDN for the client in opsi.", ip)
+				logger.debug("Lookup for %s failed: %s", host_ip, error)
+				logger.warning("Could not get a hostname for %s. This is needed to create a FQDN for the client in opsi.", host_ip)
 				logger.info("Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
 				raise error
 
 			logger.debug("Lookup of IP returned hostname %s", host)
 
-		host = host.replace('_', '-')
-
-		if host.count('.') < 2:
-			hostBefore = host
-			try:
-				host = socket.getfqdn(socket.gethostbyname(host))
-
-				try:
-					if ip == forceIPAddress(host):  # Lookup did not succeed
-						# Falling back to hopefully valid hostname
-						host = hostBefore
-				except ValueError:
-					pass  # no IP - great!
-				except NameError:
-					pass  # no deployment via IP
-			except socket.gaierror:
-				logger.debug("Lookup of %s failed.", host)
-
-		logger.debug("Host is now: %s", host)
-		if host.count('.') < 2:
-			hostId = forceHostId(f'{host}.{".".join(getFQDN().split(".")[1:])}')
-		else:
-			hostId = forceHostId(host)
-
-		logger.info("Got hostId %s", hostId)
-		return hostId
+		return _get_id_from_hostname(host, host_ip)
 
 	def _checkIfClientShouldBeSkipped(self, hostId):
 		if self.backend.host_getIdents(type='OpsiClient', id=hostId) and self.skipExistingClient:

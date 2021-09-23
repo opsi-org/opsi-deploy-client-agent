@@ -18,11 +18,11 @@ import logging
 
 from OPSI.Util.File import IniFile
 from OPSI.Util import randomString
-from OPSI.Types import forceHostId, forceIPAddress, forceUnicode, forceUnicodeLower
-from OPSI.System import copy, execute, getFQDN, umount, which
+from OPSI.Types import forceIPAddress, forceUnicode, forceUnicodeLower
+from OPSI.System import copy, execute, umount, which
 
 from opsicommon.logging import logger, secret_filter
-from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER
+from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER, _get_id_from_hostname
 
 
 def winexe(cmd, host, username, password):
@@ -209,17 +209,17 @@ class WindowsDeployThread(DeployThread):
 				self._removeHostFromBackend(hostObj)
 
 	def _getHostId(self, host):  # pylint: disable=too-many-branches
-		ip = None
+		host_ip = None
 		if self.deploymentMethod == 'ip':
-			ip = forceIPAddress(host)
+			host_ip = forceIPAddress(host)
 			try:
-				(hostname, _, _) = socket.gethostbyaddr(ip)
+				(hostname, _, _) = socket.gethostbyaddr(host_ip)
 				host = hostname
 			except socket.herror as error:
-				logger.debug("Lookup for %s failed: %s", ip, error)
+				logger.debug("Lookup for %s failed: %s", host_ip, error)
 
 				try:
-					output = winexe('cmd.exe /C "echo %COMPUTERNAME%"', ip, self.username, self.password)
+					output = winexe('cmd.exe /C "echo %COMPUTERNAME%"', host_ip, self.username, self.password)
 					for line in output:
 						if line.strip():
 							if 'unknown parameter' in line.lower():
@@ -229,36 +229,11 @@ class WindowsDeployThread(DeployThread):
 							break
 				except Exception as err:
 					logger.debug("Name lookup via winexe failed: %s", err)
-					raise Exception(f"Can't find name for IP {ip}: {err}") from err
+					raise Exception(f"Can't find name for IP {host_ip}: {err}") from err
 
 			logger.debug("Lookup of IP returned hostname %s", host)
 
-		host = host.replace('_', '-')
-
-		if host.count('.') < 2:
-			hostBefore = host
-			try:
-				host = socket.getfqdn(socket.gethostbyname(host))
-
-				try:
-					if ip == forceIPAddress(host):  # Lookup did not succeed
-						# Falling back to hopefully valid hostname
-						host = hostBefore
-				except ValueError:
-					pass  # no IP - great!
-				except NameError:
-					pass  # no deployment via IP
-			except socket.gaierror:
-				logger.debug("Lookup of %s failed.", host)
-
-		logger.debug("Host is now: %s", host)
-		if host.count('.') < 2:
-			hostId = forceHostId(f'{host}.{".".join(getFQDN().split(".")[1:])}')
-		else:
-			hostId = forceHostId(host)
-
-		logger.info("Got hostId %s", hostId)
-		return hostId
+		return _get_id_from_hostname(host, host_ip)
 
 	def _testWinexeConnection(self):
 		logger.notice("Testing winexe")

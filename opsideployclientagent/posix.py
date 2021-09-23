@@ -153,7 +153,9 @@ class PosixDeployThread(DeployThread):
 					logger.trace("Closing SSH connection failed: %s", err)
 		finally:
 			try:
-				self._executeViaSSH(f"rm -rf {remoteFolder}")
+				if self._sshConnection.get_transport():
+					# If no session could be opened, there is no need to delete remote stuff
+					self._executeViaSSH(f"rm -rf {remoteFolder}")
 			except (Exception, paramiko.SSHException) as err:  # pylint: disable=broad-except
 				logger.error(err)
 
@@ -248,16 +250,16 @@ class PosixDeployThread(DeployThread):
 			exitCode = channel.recv_exit_status()
 			out = channel.makefile("rb", -1).read().decode("utf-8", "replace")
 
-			logger.debug("Exit code was: %s", exitCode)
+		logger.debug("Exit code was: %s", exitCode)
 
-			if exitCode:
-				logger.debug("Command output: ")
-				logger.debug(out)
-				raise SSHRemoteExecutionException(
-					f"Executing {command} on remote client failed! Got exit code {exitCode}"
-				)
+		if exitCode:
+			logger.debug("Command output: ")
+			logger.debug(out)
+			raise SSHRemoteExecutionException(
+				f"Executing {command} on remote client failed! Got exit code {exitCode}"
+			)
 
-			return out
+		return out
 
 	def _getTargetArchitecture(self):
 		logger.debug("Checking architecture of client...")
