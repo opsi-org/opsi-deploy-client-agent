@@ -13,13 +13,41 @@ import time
 import threading
 import socket
 import re
+import os
+import sys
 import subprocess
 
-from OPSI.System import execute, getFQDN
-from OPSI.Object import OpsiClient, ProductOnClient
-from OPSI.Types import forceIPAddress, forceUnicodeLower, forceHostId
+from opsicommon.objects import OpsiClient, ProductOnClient
+from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import logger
 
+def getProductId():
+	#return os.path.basename(os.getcwd())
+	if getattr(sys, 'frozen', False):
+		workdir = os.path.dirname(os.path.abspath(sys.executable))	# for running as executable
+	else:
+		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
+	try:
+		os.chdir(workdir)
+	except Exception as error:
+		logger.error(error, exc_info=True)
+		raise error
+
+	if 'opsi-linux-client-agent' in workdir:
+		product_id = "opsi-linux-client-agent"
+	elif 'opsi-mac-client-agent' in workdir:
+		product_id = "opsi-mac-client-agent"
+	else:
+		product_id = "opsi-client-agent"
+	if os.path.basename(workdir) not in ["opsi-client-agent", "opsi-linux-client-agent", "opsi-mac-client-agent"]:
+		logger.warning("Calling opsi-deploy-client-agent from a modified product-id Package is dangerous - It will still be treated as opsi-[linux-|mac-]client-agent")
+	return product_id
+
+
+def execute(cmd, timeout=None):
+	logger.debug("executing %s", cmd)
+	# in case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
+	return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=timeout).decode("utf-8", errors="replace").split("\n")
 
 SKIP_MARKER = 'clientskipped'
 
@@ -44,7 +72,7 @@ def _get_id_from_hostname(host, host_ip=None):
 
 	logger.debug("Host is now: %s", host)
 	if host.count('.') < 2:
-		hostId = forceHostId(f'{host}.{".".join(getFQDN().split(".")[1:])}')
+		hostId = forceHostId(f'{host}.{".".join(socket.getfqdn().split(".")[1:])}')
 	else:
 		hostId = forceHostId(host)
 
@@ -175,7 +203,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		logger.notice("Pinging host %s ...", ipAddress)
 		alive = False
 		try:
-			subprocess.check_call(["ping", "-q", "-c2", ipAddress])
+			execute(f"ping -q -c2 {ipAddress}")
 			alive = True
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error(err)
@@ -280,16 +308,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		else:
 			self._networkAddress = ipAddress
 
-	def _setClientAgentToInstalled(self, hostId, productId):
-		poc = ProductOnClient(
-			productType='LocalbootProduct',
-			clientId=hostId,
-			productId=productId,
-			installationStatus='installed',
-			actionResult='successful'
-		)
-		self.backend.productOnClient_updateObjects([poc])
-
 	def _setClientAgentToInstalling(self, hostId, productId):
 		poc = ProductOnClient(
 			productType='LocalbootProduct',
@@ -316,3 +334,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if len(service_config) == 1 and len(service_config[0].defaultValues) >= 1:
 			return service_config[0].defaultValues[0]
 		raise ValueError("Could not determine associated configservice url")
+
+	def evaluate_success(self, hostId):
+		product_id = getProductId()
+
+		product_on_client = self.backend.productOnClient_getObjects(productId=product_id, clientId=hostId)
+		if not product_on_client or not product_on_client[0]:
+			raise ValueError(f"Product {product_id} not found on client {hostId}")
+		if not product_on_client[0].installationStatus == "installed":
+			raise ValueError(f"Installation of {product_id} on client {hostId} unsuccessful")

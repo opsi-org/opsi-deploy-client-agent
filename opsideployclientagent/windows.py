@@ -15,14 +15,12 @@ import shutil
 import re
 import os
 import logging
-
-from OPSI.Util.File import IniFile
-from OPSI.Util import randomString
-from OPSI.Types import forceIPAddress, forceUnicode, forceUnicodeLower
-from OPSI.System import copy, execute, umount, which
+import random
 
 from opsicommon.logging import logger, secret_filter
-from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER, _get_id_from_hostname
+from opsicommon.types import forceIPAddress, forceUnicode, forceUnicodeLower
+
+from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER, _get_id_from_hostname, getProductId, execute
 
 
 def winexe(cmd, host, username, password):
@@ -36,7 +34,7 @@ def winexe(cmd, host, username, password):
 		username = match.group(1) + r'\\' + match.group(2)
 
 	try:
-		executable = which('winexe')
+		executable = execute("which winexe")[0]
 	except Exception as err:  # pylint: disable=broad-except
 		logger.critical(
 			"Unable to find 'winexe'. Please install 'opsi-windows-support' "
@@ -45,7 +43,7 @@ def winexe(cmd, host, username, password):
 		raise RuntimeError("Missing 'winexe'") from err
 
 	try:
-		logger.info('Winexe Version: %s', ''.join(execute(f'{executable} -V')))
+		logger.info('Winexe Version: %s', execute(f'{executable} -V')[0])
 	except Exception as err:  # pylint: disable=broad-except
 		logger.warning("Failed to get version: %s", err)
 
@@ -75,42 +73,28 @@ class WindowsDeployThread(DeployThread):
 		else:
 			self._installWithServersideMount()
 
-	def install_from_path(self, path, hostObj, oca_major="4.2"):
-		logger.info("deploying major %s from path %s", oca_major, path)
-		self._setClientAgentToInstalling(hostObj.id, "opsi-client-agent")
+	def install_from_path(self, path, hostObj):
+		logger.info("deploying from path %s", path)
+		product_id = getProductId()
+		self._setClientAgentToInstalling(hostObj.id, product_id)
 		service_address = self._getServiceAddress(hostObj.id)
-		logger.notice("Installing opsi-client-agent")
+		logger.notice("Installing %s", product_id)
 		secret_filter.add_secrets(hostObj.opsiHostKey)
-		if oca_major == "4.2":
-			cmd = (
-				f"{path}\\files\\opsi-script\\opsi-script.exe"
-				f" /servicebatch {path}\\setup.opsiscript"
-				" c:\\opsi.org\\log\\opsi-client-agent.log"
-				" /productid opsi-client-agent"
-				f" /opsiservice {service_address}"
-				f" /clientid {hostObj.id}"
-				f" /username {hostObj.id}"
-				f" /password {hostObj.opsiHostKey}"
-				f" /parameter noreboot"
-			)
-		else:
-			cmd = (
-				f"{path}\\files\\opsi\\opsi-winst\\winst32.exe"
-				f" /batch {path}\\files\\opsi\\setup.opsiscript"
-				" c:\\opsi.org\\log\\opsi-client-agent.log /PARAMETER REMOTEDEPLOY"
-			)
-
-		for trynum in (1, 2):
-			try:
-				winexe(cmd, self.networkAddress, self.username, self.password)
-				break
-			except Exception as err:  # pylint: disable=broad-except
-				if trynum == 2:
-					raise Exception(f"Failed to install opsi-client-agent: {err}") from err
-				logger.info("Winexe failure %s, retrying", err)
-				time.sleep(2)
-		self.finalize()
-
+		cmd = (
+			f"{path}\\files\\opsi-script\\opsi-script.exe"
+			f" /servicebatch {path}\\setup.opsiscript"
+			" c:\\opsi.org\\log\\opsi-client-agent.log"
+			f" /productid {product_id}"
+			f" /opsiservice {service_address}"
+			f" /clientid {hostObj.id}"
+			f" /username {hostObj.id}"
+			f" /password {hostObj.opsiHostKey}"
+			f" /parameter noreboot"
+		)
+		try:
+			winexe(cmd, self.networkAddress, self.username, self.password)
+		except Exception as err:  # pylint: disable=broad-except
+			raise Exception(f"Failed to install {product_id}: {err}") from err
 
 	def finalize(self):
 		if self.reboot or self.shutdown:
@@ -153,38 +137,16 @@ class WindowsDeployThread(DeployThread):
 				logger.notice("Copying installation files")
 				credentials=self.username + '%' + self.password.replace("'", "'\"'\"'")
 				debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-				if os.path.exists("./setup.opsiscript"):
-					oca_major = "4.2"
-					cmd = (
-						f"{which('smbclient')} -m SMB3{debug_param} //{self.networkAddress}/c$ -U '{credentials}'"
-						" -c 'prompt; recurse;"
-						" md opsi.org; cd opsi.org; md log; md tmp; cd tmp; deltree opsi-client-agent_inst; md opsi-client-agent_inst;"
-						" cd opsi-client-agent_inst; mput files; mput setup.opsiscript; exit;'"
-					)
-				else:
-					oca_major = "4.1"
-
-					logger.notice("Patching config.ini")
-					configIniName = f'{randomString(10)}_config.ini'
-					copy(os.path.join('files', 'opsi', 'cfg', 'config.ini'), f'/tmp/{configIniName}')
-					configFile = IniFile(f'/tmp/{configIniName}')
-					config = configFile.parse()
-					if not config.has_section('shareinfo'):
-						config.add_section('shareinfo')
-					config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
-					if not config.has_section('general'):
-						config.add_section('general')
-					config.set('general', 'dnsdomain', '.'.join(hostObj.id.split('.')[1:]))
-					configFile.generate(config)
-
-					cmd = (
-						f"{which('smbclient')} -m SMB3 //{self.networkAddress}/c$ -U '{self.username + '%' + self.password}' "
-						"-c 'prompt; recurse; md opsi.org; cd opsi.org; md tmp; cd tmp; md opsi-client-agent_inst; cd opsi-client-agent_inst; "
-						f"mput files; mput utils; cd files\\opsi\\cfg; lcd /tmp; put {configIniName} config.ini; exit;'"
-					)
+				smbclient_cmd = execute("which smbclient")[0]
+				cmd = (
+					f"{smbclient_cmd} -m SMB3{debug_param} //{self.networkAddress}/c$ -U '{credentials}'"
+					" -c 'prompt; recurse;"
+					" md opsi.org; cd opsi.org; md log; md tmp; cd tmp; deltree opsi-client-agent_inst; md opsi-client-agent_inst;"
+					" cd opsi-client-agent_inst; mput files; mput setup.opsiscript; exit;'"
+				)
 				execute(cmd)
 
-				self.install_from_path(r"c:\\opsi.org\\tmp\\opsi-client-agent_inst", hostObj, oca_major)
+				self.install_from_path(r"c:\\opsi.org\\tmp\\opsi-client-agent_inst", hostObj)
 			finally:
 				try:
 					cmd = (
@@ -195,9 +157,10 @@ class WindowsDeployThread(DeployThread):
 				except Exception as err:  # pylint: disable=broad-except
 					logger.error(err)
 
-			logger.notice("opsi-client-agent successfully installed on %s", hostId)
+			self.finalize()
+			self.evaluate_success(hostObj.id)	#throws Exception if fail
+			logger.notice("%s successfully installed on %s", getProductId(), hostId)
 			self.success = True
-			self._setClientAgentToInstalled(hostId, "opsi-client-agent")
 		except SkipClientException:
 			logger.notice("Skipping host %s", hostId)
 			self.success = SKIP_MARKER
@@ -238,54 +201,51 @@ class WindowsDeployThread(DeployThread):
 	def _testWinexeConnection(self):
 		logger.notice("Testing winexe")
 		cmd = r'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
-		for trynum in (1, 2):
-			try:
-				winexe(cmd, self.networkAddress, self.username, self.password)
-				break
-			except Exception as err:  # pylint: disable=broad-except
-				if 'NT_STATUS_LOGON_FAILURE' in str(err):
-					logger.warning("Can't connect to %s: check your credentials", self.networkAddress)
-				elif 'NT_STATUS_IO_TIMEOUT' in str(err):
-					logger.warning("Can't connect to %s: firewall on client seems active", self.networkAddress)
-
-				if trynum == 2:
-					raise Exception(f"Failed to execute command on host {self.networkAddress}: winexe error: {err}") from err
-				logger.info("Winexe failure %s, retrying", err)
-				time.sleep(2)
+		try:
+			winexe(cmd, self.networkAddress, self.username, self.password)
+		except Exception as err:  # pylint: disable=broad-except
+			if 'NT_STATUS_LOGON_FAILURE' in str(err):
+				logger.warning("Can't connect to %s: check your credentials", self.networkAddress)
+			elif 'NT_STATUS_IO_TIMEOUT' in str(err):
+				logger.warning("Can't connect to %s: firewall on client seems active", self.networkAddress)
+			raise Exception(f"Failed to execute command {cmd} on host {self.networkAddress}: winexe error: {err}") from err
 
 	def _installWithServersideMount(self):  # pylint: disable=too-many-branches,too-many-statements
 		logger.debug('Installing using server-side mount.')
 		host = forceUnicodeLower(self.host)
-		hostId = ''
 		hostObj = None
 		mountDir = ''
 		instDir = ''
+		hostId = self._getHostId(host)
 		try:
-			hostId = self._getHostId(host)
 			self._checkIfClientShouldBeSkipped(hostId)
+		except SkipClientException:
+			logger.notice("Skipping host %s", hostId)
+			self.success = SKIP_MARKER
+			return
 
-			logger.notice("Starting deployment to host %s", hostId)
+		logger.notice("Starting deployment to host %s", hostId)
+		try:
 			hostObj = self._prepareDeploymentToHost(hostId)
 			self._testWinexeConnection()
 
-			mountDir = os.path.join('/tmp', 'mnt_' + randomString(10))
+			mountDir = os.path.join(
+				'/tmp',
+				'mnt_' + ''.join(random.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(10))
+			)
 			os.makedirs(mountDir)
 
-			if os.path.exists("./setup.opsiscript"):
-				oca_major = "4.2"
-			else:
-				oca_major = "4.1"
-
 			logger.notice("Mounting c$ share")
+			mount_cmd = execute("which mount")[0]
 			try:
 				password = self.password.replace("'", "'\"'\"'")
 				try:
-					execute(f"{which('mount')} -t cifs -o'username={self.username},password={password}' //{self.networkAddress}/c$ {mountDir}",
+					execute(f"{mount_cmd} -t cifs -o'username={self.username},password={password}' //{self.networkAddress}/c$ {mountDir}",
 						timeout=15
 					)
 				except Exception as err:  # pylint: disable=broad-except
 					logger.info("Failed to mount clients c$ share: %s, retrying with port 139", err)
-					execute(f"{which('mount')} -t cifs -o'port=139,username={self.username},password={password}' //{self.networkAddress}/c$ {mountDir}",
+					execute(f"{mount_cmd} -t cifs -o'port=139,username={self.username},password={password}' //{self.networkAddress}/c$ {mountDir}",
 						timeout=15
 					)
 			except Exception as err:  # pylint: disable=broad-except
@@ -295,57 +255,44 @@ class WindowsDeployThread(DeployThread):
 				) from err
 
 			logger.notice("Copying installation files")
-			instDirName = f'opsi_{randomString(10)}'
+			instDirName = f'opsi_{"".join(random.choice("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") for _ in range(10))}'
 			instDir = os.path.join(mountDir, instDirName)
 			os.makedirs(instDir)
 			if not os.path.exists(os.path.join(mountDir, 'tmp')):
 				os.makedirs(os.path.join(mountDir, 'tmp'))
 
-			copy('files', instDir)
-			copy('utils', instDir)
+			shutil.copytree('files', instDir)
+			shutil.copy('setup.opsiscript', instDir)
 
-			logger.notice("Patching config.ini")
-			configFile = IniFile(os.path.join(instDir, 'files', 'opsi', 'cfg', 'config.ini'))
-			config = configFile.parse()
-			if not config.has_section('shareinfo'):
-				config.add_section('shareinfo')
-			config.set('shareinfo', 'pckey', hostObj.opsiHostKey)
-			if not config.has_section('general'):
-				config.add_section('general')
-			config.set('general', 'dnsdomain', '.'.join(hostObj.id.split('.')[1:]))
-			configFile.generate(config)
+			try:
+				self.install_from_path(f"c:\\{instDirName}", hostObj)
+			finally:
+				if instDir or mountDir:
+					logger.notice("Cleaning up")
 
-			self.install_from_path(f"c:\\{instDirName}", hostObj, oca_major)
-			logger.notice("opsi-client-agent successfully installed on %s", hostId)
+				if instDir:
+					try:
+						shutil.rmtree(instDir)
+					except OSError as err:
+						logger.debug('Removing %s failed: %s', instDir, err)
+
+				if mountDir:
+					try:
+						execute(f"umount {mountDir}")
+					except Exception as err:  # pylint: disable=broad-except
+						logger.warning('Unmounting %s failed: %s', mountDir, err)
+
+					try:
+						os.rmdir(mountDir)
+					except OSError as err:
+						logger.debug('Removing %s failed: %s', instDir, err)
+
+			self.finalize()
+			self.evaluate_success(hostObj.id)	#throws Exception if fail
+			logger.notice("%s successfully installed on %s", getProductId(), hostId)
 			self.success = True
-			#TODO: remove for 4.2 only
-			self._setClientAgentToInstalled(hostId, "opsi-client-agent")
-		except SkipClientException:
-			logger.notice("Skipping host %s", hostId)
-			self.success = SKIP_MARKER
-			return
 		except Exception as err:  # pylint: disable=broad-except
 			self.success = False
 			logger.error("Deployment to %s failed: %s", self.host, err)
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
-		finally:
-			if instDir or mountDir:
-				logger.notice("Cleaning up")
-
-			if instDir:
-				try:
-					shutil.rmtree(instDir)
-				except OSError as err:
-					logger.debug('Removing %s failed: %s', instDir, err)
-
-			if mountDir:
-				try:
-					umount(mountDir)
-				except Exception as err:  # pylint: disable=broad-except
-					logger.warning('Unmounting %s failed: %s', mountDir, err)
-
-				try:
-					os.rmdir(mountDir)
-				except OSError as err:
-					logger.debug('Removing %s failed: %s', instDir, err)

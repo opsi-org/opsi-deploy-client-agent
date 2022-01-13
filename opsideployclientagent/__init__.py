@@ -18,11 +18,11 @@ import os
 import time
 
 from OPSI.Backend.BackendManager import BackendManager
-from OPSI.System import which
-from OPSI.Types import forceUnicode, forceUnicodeLower
 
 from opsicommon.logging import logger, LOG_WARNING, LOG_DEBUG, logging_config, secret_filter
-from opsideployclientagent.common import SKIP_MARKER
+from opsicommon.types import forceUnicode, forceUnicodeLower
+
+from opsideployclientagent.common import SKIP_MARKER, execute
 from opsideployclientagent.posix import PosixDeployThread, paramiko, WARNING_POLICY
 from opsideployclientagent.windows import WindowsDeployThread
 
@@ -106,8 +106,8 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		if mountWithSmbclient:
 			logger.debug('Explicit check for smbclient.')
 			try:
-				which('smbclient')
-			except Exception as err:
+				execute("which smbclient")
+			except Exception as err:	# pylint: disable=broad-except
 				raise Exception(f"Please make sure that 'smbclient' is installed: {err}") from err
 		elif os.getuid() != 0:
 			raise Exception("You have to be root to use mount.")

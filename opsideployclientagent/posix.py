@@ -15,10 +15,10 @@ import re
 import socket
 from contextlib import closing, contextmanager
 
-from OPSI.Types import forceUnicodeLower
-
 from opsicommon.logging import logger, secret_filter
-from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER
+from opsicommon.types import forceUnicodeLower
+
+from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER, getProductId
 
 try:
 	import paramiko	# type: ignore
@@ -73,7 +73,7 @@ class PosixDeployThread(DeployThread):
 			else:
 				localFolder = os.path.dirname(os.path.abspath(__file__))			# for running from python
 
-			prod_id = self._getProductId()
+			product_id = getProductId()
 			credentialsfile=None
 			try:
 				logger.notice("Copying installation scripts...")
@@ -95,13 +95,12 @@ class PosixDeployThread(DeployThread):
 				self._executeViaSSH(f"chmod +x {opsiscript}")
 
 				service_address = self._getServiceAddress(hostObj.id)
-				product = self._getProductId()
 
 				secret_filter.add_secrets(hostObj.opsiHostKey)
 				installCommand = (
 					f"{opsiscript} /tmp/opsi-client-agent/setup.opsiscript"
 					" /var/log/opsi-script/opsi-client-agent.log -servicebatch"
-					f" -productid {product}"
+					f" -productid {product_id}"
 					f" -opsiservice {service_address}"
 					f" -clientid {hostObj.id}"
 					f" -username {hostObj.id}"
@@ -116,12 +115,10 @@ class PosixDeployThread(DeployThread):
 					self._executeViaSSH(f"echo '{self.password}' > {credentialsfile}")
 					self._executeViaSSH(f'echo "\n" >> {credentialsfile}')
 
-				self._setClientAgentToInstalling(hostObj.id, prod_id)
+				self._setClientAgentToInstalling(hostObj.id, product_id)
 				logger.notice('Running installation script...')
 				logger.info('Executing %s', installCommand)
 				self._executeViaSSH(installCommand, credentialsfile=credentialsfile)
-
-				self.evaluate_success(credentialsfile=credentialsfile)
 				self.finalize(credentialsfile=credentialsfile)
 			finally:
 				try:
@@ -130,9 +127,9 @@ class PosixDeployThread(DeployThread):
 				except Exception:  # pylint: disable=broad-except
 					logger.error("Cleanup failed")
 
+			self.evaluate_success(hostObj.id)	#throws Exception if fail
 			logger.notice("opsi-client-agent successfully installed on %s", hostId)
 			self.success = True
-			self._setClientAgentToInstalled(hostId, prod_id)
 		except SkipClientException:
 			logger.notice("Skipping host %s", hostId)
 			self.success = SKIP_MARKER
@@ -140,8 +137,6 @@ class PosixDeployThread(DeployThread):
 		except (Exception, paramiko.SSHException) as err:  # pylint: disable=broad-except
 			logger.error("Deployment to %s failed: %s", self.host, err)
 			self.success = False
-			if 'Incompatible ssh peer (no acceptable kex algorithm)' in str(err):
-				logger.error("Please install paramiko v1.15.1 or newer")
 
 			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
 				self._removeHostFromBackend(hostObj)
@@ -158,25 +153,6 @@ class PosixDeployThread(DeployThread):
 					self._executeViaSSH(f"rm -rf {remoteFolder}")
 			except (Exception, paramiko.SSHException) as err:  # pylint: disable=broad-except
 				logger.error(err)
-
-
-	def evaluate_success(self, credentialsfile=None):
-		# these commands throw exceptions if exitcode != 0
-		logger.debug("Testing if folder was created...")
-		self._executeViaSSH("test -d /etc/opsi-client-agent/")
-		logger.debug("Testing if config can be found...")
-		checkCommand = "test -e /etc/opsi-client-agent/opsiclientd.conf"
-		self._executeViaSSH(checkCommand, credentialsfile=credentialsfile)
-
-		logger.debug("Testing if executable was found...")
-		if self.target_os == "linux":
-			self._executeViaSSH("test -e /usr/bin/opsiclientd -a -e /usr/bin/opsi-script")
-		elif self.target_os == "macos":
-			self._executeViaSSH("test -e /usr/local/bin/opsiclientd -a -e /usr/local/bin/opsi-script")
-		else:
-			raise ValueError(f"invalid target os {self.target_os}")
-		#TODO: check productonclient?
-
 
 	def finalize(self, credentialsfile=None):
 		if self.reboot or self.shutdown:
@@ -324,10 +300,3 @@ class PosixDeployThread(DeployThread):
 
 						logger.trace("Copying %s -> %s", local, remote)
 						ftpConnection.put(local, remote)
-
-	def _getProductId(self):
-		if self.target_os == "linux":
-			return "opsi-linux-client-agent"
-		if self.target_os == "macos":
-			return "opsi-mac-client-agent"
-		raise ValueError(f"invalid target os {self.target_os}")

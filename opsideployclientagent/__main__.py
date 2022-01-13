@@ -28,37 +28,26 @@ installed via opsi.
 :author: Niko Wenselowski <n.wenselowski@uib.de>
 :license: GNU Affero General Public License version 3
 """
-import os
 import sys
 import argparse
 
-from OPSI import __version__ as python_opsi_version
-
+from opsicommon import __version__ as python_opsi_common_version
 from opsicommon.logging import logging_config, logger
 from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
 from opsideployclientagent.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
 from opsideployclientagent import deploy_client_agent, __version__
-
+from opsideployclientagent.common import getProductId
 
 def get_target_os():
-	if getattr(sys, 'frozen', False):
-		workdir = os.path.dirname(os.path.abspath(sys.executable))	# for running as executable
-	else:
-		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
-	try:
-		os.chdir(workdir)
-	except Exception as error:
-		logger.error(error, exc_info=True)
-		raise error
-
-	# If we are inside a folder with 'opsi-linux-client-agent' in it's
-	# name we assume that we want to deploy the opsi-linux-client-agent.
-	if 'opsi-linux-client-agent' in workdir:
+	product_id = getProductId()
+	if product_id == "opsi-client-agent":
+		return "windows"
+	if product_id == "opsi-linux-client-agent":
 		return "linux"
-	if 'opsi-mac-client-agent' in workdir:
+	if product_id == "opsi-mac-client-agent":
 		return "macos"
-	return "windows"
+	raise ValueError(f"Unknown product_id {product_id} cannot match os")
 
 def parse_args(target_os):
 	scriptDescription = "Deploy opsi client agent to the specified clients."
@@ -78,7 +67,7 @@ def parse_args(target_os):
 		defaultUser = "Administrator"
 
 	parser = argparse.ArgumentParser(description=scriptDescription)
-	parser.add_argument('--version', '-V', action='version', version=f"{__version__} [python-opsi={python_opsi_version}]")
+	parser.add_argument('--version', '-V', action='version', version=f"{__version__} [python-opsi-common={python_opsi_common_version}]")
 	parser.add_argument('--verbose', '-v',
 						dest="logLevel", default=LOG_WARNING, action="count",
 						help="increase verbosity (can be used multiple times)")
