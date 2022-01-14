@@ -30,12 +30,12 @@ installed via opsi.
 """
 import sys
 import argparse
+import paramiko
 
 from opsicommon import __version__ as python_opsi_common_version
 from opsicommon.logging import logging_config, logger
 from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING
 
-from opsideployclientagent.posix import AUTO_ADD_POLICY, WARNING_POLICY, REJECT_POLICY
 from opsideployclientagent import deploy_client_agent, __version__
 from opsideployclientagent.common import getProductId
 
@@ -95,13 +95,13 @@ def parse_args(target_os):
 	if target_os in ("linux", "macos"):
 		sshPolicyGroup = parser.add_mutually_exclusive_group()
 		sshPolicyGroup.add_argument('--ssh-hostkey-add', dest="sshHostkeyPolicy",
-									const=AUTO_ADD_POLICY, action="store_const",
+									const=paramiko.AutoAddPolicy, action="store_const",
 									help="Automatically add unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-reject', dest="sshHostkeyPolicy",
-									const=REJECT_POLICY, action="store_const",
+									const=paramiko.RejectPolicy, action="store_const",
 									help="Reject unknown SSH hostkeys.")
 		sshPolicyGroup.add_argument('--ssh-hostkey-warn', dest="sshHostkeyPolicy",
-									const=WARNING_POLICY, action="store_const",
+									const=paramiko.WarningPolicy, action="store_const",
 									help="Warn when encountering unknown SSH hostkeys. (Default)")
 
 	postInstallationAction = parser.add_mutually_exclusive_group()

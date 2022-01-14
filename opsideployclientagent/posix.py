@@ -12,24 +12,12 @@ This module contains the class PosixDeployThread and related methods.
 import sys
 import os
 import re
-import socket
 from contextlib import closing, contextmanager
+import paramiko
 
 from opsicommon.logging import logger, secret_filter
-from opsicommon.types import forceUnicodeLower
 
-from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER, getProductId
-
-try:
-	import paramiko	# type: ignore
-	AUTO_ADD_POLICY = paramiko.AutoAddPolicy
-	WARNING_POLICY = paramiko.WarningPolicy
-	REJECT_POLICY = paramiko.RejectPolicy
-except ImportError:
-	paramiko = None
-	AUTO_ADD_POLICY = None
-	WARNING_POLICY = None
-	REJECT_POLICY = None
+from opsideployclientagent.common import DeployThread, SkipClientException, SKIP_MARKER
 
 class SSHRemoteExecutionException(Exception):
 	pass
@@ -40,7 +28,7 @@ class PosixDeployThread(DeployThread):
 		target_os, deploymentMethod="hostname", stopOnPingFailure=True,
 		skipExistingClient=False, mountWithSmbclient=True,
 		keepClientOnFailure=False, additionalClientSettings=None,
-		depot=None, group=None, sshPolicy=WARNING_POLICY
+		depot=None, group=None, sshPolicy=paramiko.WarningPolicy
 	):
 
 		DeployThread.__init__(self, host, backend, username, password, shutdown,
@@ -51,111 +39,66 @@ class PosixDeployThread(DeployThread):
 		self.target_os = target_os
 		self._sshConnection = None
 		self._sshPolicy = sshPolicy
+		self.credentialsfile = None
 
-	def run(self):
-		self._installWithSSH()
 
-	def _installWithSSH(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-		logger.debug('Installing with files copied to client via scp.')
-		host = forceUnicodeLower(self.host)
-		hostId = ''
-		hostObj = None
-		remoteFolder = os.path.join('/tmp', 'opsi-client-agent')
-		try:
-			hostId = self._getHostId(host)
-			self._checkIfClientShouldBeSkipped(hostId)
+	def copy_data(self):
+		remote_folder = os.path.join('/tmp', 'opsi-client-agent')
+		if getattr(sys, 'frozen', False):
+			localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+		else:
+			localFolder = os.path.dirname(os.path.abspath(__file__))			# for running from python
 
-			logger.notice("Starting deployment to host %s", hostId)
-			hostObj = self._prepareDeploymentToHost(hostId)
+		self._executeViaSSH("rm -rf /tmp/opsi-client-agent")				# clean up previous run
+		logger.notice("Copying installation scripts...")
+		self._copyOverSSH(os.path.join(localFolder, 'files'), remote_folder)
+		if not os.path.exists(os.path.join(localFolder, 'custom')):
+			os.makedirs(os.path.join(localFolder, 'custom'))
+		self._copyOverSSH(os.path.join(localFolder, 'custom'), remote_folder)
+		self._copyOverSSH(os.path.join(localFolder, 'setup.opsiscript'), os.path.join(remote_folder, 'setup.opsiscript'))
+		return remote_folder
 
-			if getattr(sys, 'frozen', False):
-				localFolder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
-			else:
-				localFolder = os.path.dirname(os.path.abspath(__file__))			# for running from python
 
-			product_id = getProductId()
-			credentialsfile=None
-			try:
-				logger.notice("Copying installation scripts...")
-				self._executeViaSSH("rm -rf /tmp/opsi-client-agent")				# clean up previous run
-				self._copyDirectoryOverSSH(os.path.join(localFolder, 'files'), remoteFolder)
-				if not os.path.exists(os.path.join(localFolder, 'custom')):
-					os.makedirs(os.path.join(localFolder, 'custom'))
-				self._copyDirectoryOverSSH(os.path.join(localFolder, 'custom'), remoteFolder)
-				self._copyFileOverSSH(os.path.join(localFolder, 'setup.opsiscript'), os.path.join(remoteFolder, 'setup.opsiscript'))
+	def run_installation(self, remote_folder):
+		if self.target_os == "linux":
+			opsiscript = "/tmp/opsi-client-agent/files/opsi-script/opsi-script"
+		elif self.target_os == "macos":
+			opsiscript = "/tmp/opsi-client-agent/files/opsi-script.app/Contents/MacOS/opsi-script"
+		else:
+			raise ValueError(f"invalid target os {self.target_os}")
 
-				if self.target_os == "linux":
-					opsiscript = "/tmp/opsi-client-agent/files/opsi-script/opsi-script"
-				elif self.target_os == "macos":
-					opsiscript = "/tmp/opsi-client-agent/files/opsi-script.app/Contents/MacOS/opsi-script"
-				else:
-					raise ValueError(f"invalid target os {self.target_os}")
+		logger.debug("Will use: %s", opsiscript)
+		self._executeViaSSH(f"chmod +x {opsiscript}")
 
-				logger.debug("Will use: %s", opsiscript)
-				self._executeViaSSH(f"chmod +x {opsiscript}")
+		secret_filter.add_secrets(self.hostObj.opsiHostKey)
+		installCommand = (
+			f"{opsiscript} /tmp/opsi-client-agent/setup.opsiscript"
+			" /var/log/opsi-script/opsi-client-agent.log -servicebatch"
+			f" -productid {self.product_id}"
+			f" -opsiservice {self._getServiceAddress(self.hostObj.id)}"
+			f" -clientid {self.hostObj.id}"
+			f" -username {self.hostObj.id}"
+			f" -password {self.hostObj.opsiHostKey}"
+			f" -parameter noreboot"
+		)
+		if self.username != 'root':
+			credentialsfile = os.path.join(remote_folder, '.credentials')
+			logger.notice("Writing credentialsfile %s", credentialsfile)
+			self._executeViaSSH(f"touch {credentialsfile}")
+			self._executeViaSSH(f"chmod 600 {credentialsfile}")
+			self._executeViaSSH(f"echo '{self.password}' > {credentialsfile}")
+			self._executeViaSSH(f'echo "\n" >> {credentialsfile}')
+			self.credentialsfile = credentialsfile
 
-				service_address = self._getServiceAddress(hostObj.id)
+		self._setClientAgentToInstalling(self.hostObj.id, self.product_id)
+		logger.notice('Running installation script...')
+		logger.info('Executing %s', installCommand)
+		self._executeViaSSH(installCommand)
 
-				secret_filter.add_secrets(hostObj.opsiHostKey)
-				installCommand = (
-					f"{opsiscript} /tmp/opsi-client-agent/setup.opsiscript"
-					" /var/log/opsi-script/opsi-client-agent.log -servicebatch"
-					f" -productid {product_id}"
-					f" -opsiservice {service_address}"
-					f" -clientid {hostObj.id}"
-					f" -username {hostObj.id}"
-					f" -password {hostObj.opsiHostKey}"
-					f" -parameter noreboot"
-				)
-				if self.username != 'root':
-					credentialsfile = os.path.join(remoteFolder, '.credentials')
-					logger.notice("Writing credentialsfile %s", credentialsfile)
-					self._executeViaSSH(f"touch {credentialsfile}")
-					self._executeViaSSH(f"chmod 600 {credentialsfile}")
-					self._executeViaSSH(f"echo '{self.password}' > {credentialsfile}")
-					self._executeViaSSH(f'echo "\n" >> {credentialsfile}')
 
-				self._setClientAgentToInstalling(hostObj.id, product_id)
-				logger.notice('Running installation script...')
-				logger.info('Executing %s', installCommand)
-				self._executeViaSSH(installCommand, credentialsfile=credentialsfile)
-				self.finalize(credentialsfile=credentialsfile)
-			finally:
-				try:
-					if credentialsfile:
-						self._executeViaSSH(f"rm -f {credentialsfile}")
-				except Exception:  # pylint: disable=broad-except
-					logger.error("Cleanup failed")
-
-			self.evaluate_success(hostObj.id)	#throws Exception if fail
-			logger.notice("opsi-client-agent successfully installed on %s", hostId)
-			self.success = True
-		except SkipClientException:
-			logger.notice("Skipping host %s", hostId)
-			self.success = SKIP_MARKER
-			return
-		except (Exception, paramiko.SSHException) as err:  # pylint: disable=broad-except
-			logger.error("Deployment to %s failed: %s", self.host, err)
-			self.success = False
-
-			if self._clientCreatedByScript and hostObj and not self.keepClientOnFailure:
-				self._removeHostFromBackend(hostObj)
-
-			if self._sshConnection is not None:
-				try:
-					self._sshConnection.close()
-				except Exception as err:  # pylint: disable=broad-except
-					logger.trace("Closing SSH connection failed: %s", err)
-		finally:
-			try:
-				if self._sshConnection.get_transport():
-					# If no session could be opened, there is no need to delete remote stuff
-					self._executeViaSSH(f"rm -rf {remoteFolder}")
-			except (Exception, paramiko.SSHException) as err:  # pylint: disable=broad-except
-				logger.error(err)
-
-	def finalize(self, credentialsfile=None):
+	def finalize(self):
 		if self.reboot or self.shutdown:
+			# remove credentialsfile in 1min time window between call and execution of reboot/shutdown
 			#TODO: shutdown blocks on macos until it is concluded -> error
 			if self.reboot:
 				logger.notice("Rebooting machine %s", self.networkAddress)
@@ -164,7 +107,7 @@ class PosixDeployThread(DeployThread):
 				logger.notice("Shutting down machine %s", self.networkAddress)
 				cmd = r'shutdown -h +1 & disown'
 			try:
-				self._executeViaSSH(cmd, credentialsfile=credentialsfile)
+				self._executeViaSSH(cmd)
 			except Exception as err:  # pylint: disable=broad-except
 				if self.reboot:
 					logger.error("Failed to reboot computer: %s", err)
@@ -174,9 +117,9 @@ class PosixDeployThread(DeployThread):
 			try:
 				logger.notice("Starting opsiclientd on machine %s", self.networkAddress)
 				if self.target_os == "linux":
-					self._executeViaSSH("systemctl start opsiclientd", credentialsfile=credentialsfile)
+					self._executeViaSSH("systemctl start opsiclientd")
 				elif self.target_os == "macos":
-					self._executeViaSSH("launchctl load /Library/LaunchDaemons/org.opsi.opsiclientd.plist", credentialsfile=credentialsfile)
+					self._executeViaSSH("launchctl load /Library/LaunchDaemons/org.opsi.opsiclientd.plist")
 				else:
 					raise ValueError(f"invalid target os {self.target_os}")
 
@@ -184,24 +127,34 @@ class PosixDeployThread(DeployThread):
 				logger.error("Failed to start opsiclientd on %s: %s", self.networkAddress, err)
 
 
-	def _getHostId(self, host):
-		hostId = None
+	def cleanup(self, remote_folder):
 		try:
-			hostId = super()._getHostId(host)
-		except socket.herror:
-			logger.warning("Resolving hostName failed, attempting to resolve fqdn via ssh connection to ip")
-			if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', host):
-				ssh = paramiko.SSHClient()
-				ssh.set_missing_host_key_policy(self._sshPolicy())
-				ssh.connect(host, "22", self.username, self.password)
-				_, stdout, _ = ssh.exec_command("hostname -f")
-				hostId = stdout.readlines()[0].encode('ascii','ignore').strip()
-				logger.info("resolved FQDN: %s (type %s)", hostId, type(hostId))
+			if remote_folder:
+				self._executeViaSSH(f"rm -rf {remote_folder}")
+		except Exception:  # pylint: disable=broad-except
+			logger.error("Cleanup failed")
+
+		if self._sshConnection is not None:
+			try:
+				self._sshConnection.close()
+			except Exception as err:  # pylint: disable=broad-except
+				logger.trace("Closing SSH connection failed: %s", err)
+
+
+	def ask_host_for_hostname(self, host):
+		if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', host):
+			ssh = paramiko.SSHClient()
+			ssh.set_missing_host_key_policy(self._sshPolicy())
+			ssh.connect(host, "22", self.username, self.password)
+			_, stdout, _ = ssh.exec_command("hostname -f")
+			hostId = stdout.readlines()[0].encode('ascii','ignore').strip()
+			logger.info("resolved FQDN: %s (type %s)", hostId, type(hostId))
 		if hostId:
 			return hostId
 		raise ValueError(f"invalid host {host}")
 
-	def _executeViaSSH(self, command, credentialsfile=None):
+
+	def _executeViaSSH(self, command):
 		"""
 		Executing a command via SSH.
 
@@ -210,13 +163,13 @@ class PosixDeployThread(DeployThread):
 		"""
 		self._connectViaSSH()
 
-		if credentialsfile:
+		if self.credentialsfile:
 			if "&" in command:
 				parts = command.split("&", 1)
-				command = f"sudo --stdin -- {parts[0]} < {credentialsfile} &{parts[1]}"
+				command = f"sudo --stdin -- {parts[0]} < {self.credentialsfile} &{parts[1]}"
 			else:
-				command = f"sudo --stdin -- {command} < {credentialsfile}"
-		logger.debug("Executing on remote: %s", command)
+				command = f"sudo --stdin -- {command} < {self.credentialsfile}"
+		logger.info("Executing on remote: %s", command)
 
 		with closing(self._sshConnection.get_transport().open_session()) as channel:
 			channel.set_combine_stderr(True)
@@ -227,22 +180,14 @@ class PosixDeployThread(DeployThread):
 			out = channel.makefile("rb", -1).read().decode("utf-8", "replace")
 
 		logger.debug("Exit code was: %s", exitCode)
-
 		if exitCode:
 			logger.debug("Command output: ")
 			logger.debug(out)
 			raise SSHRemoteExecutionException(
 				f"Executing {command} on remote client failed! Got exit code {exitCode}"
 			)
-
 		return out
 
-	def _getTargetArchitecture(self):
-		logger.debug("Checking architecture of client...")
-		output = self._executeViaSSH('uname -m')
-		if "64" not in output:
-			return "32"
-		return "64"
 
 	def _connectViaSSH(self):
 		if self._sshConnection is not None:
@@ -259,13 +204,8 @@ class PosixDeployThread(DeployThread):
 			password=self.password
 		)
 
-	def _copyFileOverSSH(self, localPath, remotePath):
-		self._connectViaSSH()
 
-		with closing(self._sshConnection.open_sftp()) as ftpConnection:
-			ftpConnection.put(localPath, remotePath)
-
-	def _copyDirectoryOverSSH(self, localPath, remotePath):
+	def _copyOverSSH(self, localPath, remotePath):
 		@contextmanager
 		def changeDirectory(path):
 			currentDir = os.getcwd()
@@ -282,11 +222,14 @@ class PosixDeployThread(DeployThread):
 		self._connectViaSSH()
 
 		with closing(self._sshConnection.open_sftp()) as ftpConnection:
-			createFolderIfMissing(remotePath)
-
 			if not os.path.exists(localPath):
 				raise ValueError(f"Can't find local path '{localPath}'")
 
+			if os.path.isfile(localPath):
+				ftpConnection.put(localPath, remotePath)
+				return
+
+			createFolderIfMissing(remotePath)
 			# The following stunt is necessary to get results in 'dirpath'
 			# that can be easily used for folder creation on the remote.
 			with changeDirectory(os.path.join(localPath, '..')):

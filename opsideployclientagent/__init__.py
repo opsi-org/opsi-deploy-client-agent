@@ -16,6 +16,7 @@ __version__ = '4.2.0.14'
 import getpass
 import os
 import time
+import paramiko
 
 from OPSI.Backend.BackendManager import BackendManager
 
@@ -23,7 +24,7 @@ from opsicommon.logging import logger, LOG_WARNING, LOG_DEBUG, logging_config, s
 from opsicommon.types import forceUnicode, forceUnicodeLower
 
 from opsideployclientagent.common import SKIP_MARKER, execute
-from opsideployclientagent.posix import PosixDeployThread, paramiko, WARNING_POLICY
+from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
 
@@ -41,15 +42,6 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	if not target_os in ("linux", "macos") and username is None:
 		username = "Administrator"
 	logging_config(stderr_level=logLevel, log_file=debugFile, file_level=LOG_DEBUG)
-
-	if target_os in ("linux", "macos") and paramiko is None:
-		message = (
-			"Could not import 'paramiko'. "
-			"Deploying to Linux/Macos not possible. "
-			"Please install paramiko through your package manager or pip."
-		)
-		logger.critical(message)
-		raise Exception(message)
 
 	additionalHostInfos = {}
 	if hostFile:
@@ -169,7 +161,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 				pass
 
 			if target_os in ("linux", "macos"):
-				clientConfig["sshPolicy"] = sshHostkeyPolicy or WARNING_POLICY
+				clientConfig["sshPolicy"] = sshHostkeyPolicy or paramiko.WarningPolicy
 				clientConfig["target_os"] = target_os
 
 			thread = deploymentClass(**clientConfig)
