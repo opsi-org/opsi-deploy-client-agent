@@ -88,9 +88,8 @@ def parse_args(target_os):
 	network_access_group.add_argument('--use-ip-address', dest="deployment_method",
 									action='store_const', const="ip",
 									help="Use IP address to connect to client.")
-	parser.add_argument('--ignore-failed-ping', '-x',
-						dest="stop_on_ping_failure", default=True,
-						action="store_false",
+	parser.add_argument('--ignore-failed-ping', '-x', dest="stop_on_ping_failure",
+						default=True, action="store_false",
 						help="try installation even if ping fails")
 	if target_os in ("linux", "macos"):
 		ssh_policy_group = parser.add_mutually_exclusive_group()
@@ -109,7 +108,7 @@ def parse_args(target_os):
 										const="reboot", action="store_const",
 										help="reboot computer after installation")
 	finalize_action_group.add_argument('--shutdown', '-s', dest="finalize_action",
-										const="reboot", action="store_const",
+										const="shutdown", action="store_const",
 										help="shutdown computer after installation")
 	finalize_action_group.add_argument('--start-opsiclientd', '-o', dest="finalize_action",
 										const="start_service", action="store_const",
