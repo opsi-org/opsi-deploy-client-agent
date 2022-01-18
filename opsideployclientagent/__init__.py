@@ -16,60 +16,49 @@ __version__ = '4.2.0.14'
 import getpass
 import os
 import time
+import paramiko
 
 from OPSI.Backend.BackendManager import BackendManager
-from OPSI.System import which
-from OPSI.Types import forceUnicode, forceUnicodeLower
 
-from opsicommon.logging import logger, LOG_WARNING, LOG_DEBUG, logging_config, secret_filter
-from opsideployclientagent.common import SKIP_MARKER
-from opsideployclientagent.posix import PosixDeployThread, paramiko, WARNING_POLICY
+from opsicommon.logging import logger, secret_filter
+from opsicommon.types import forceUnicode, forceUnicodeLower
+
+from opsideployclientagent.common import SKIP_MARKER, execute
+from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
-	hosts, target_os, logLevel=LOG_WARNING, debugFile=None, hostFile=None,
-	password=None, maxThreads=1, useIPAddress=False, useNetbios=False,
-	useFQDN=False, mountWithSmbclient=True, depot=None, group=None,
-	username=None, shutdown=False, reboot=False, startService=True,
-	stopOnPingFailure=False, skipExistingClient=False,
-	keepClientOnFailure=True, sshHostkeyPolicy=None
+	hosts, target_os, host_file=None, password=None, max_threads=1,
+	deployment_method="auto", mount_with_smbclient=True, depot=None, group=None,
+	finalize_action="start_service", username=None,
+	stop_on_ping_failure=False, skip_existing_client=False,
+	keep_client_on_failure=True, ssh_hostkey_policy=None
 ):
 
 	if target_os in ("linux", "macos") and username is None:
 		username = "root"
 	if not target_os in ("linux", "macos") and username is None:
 		username = "Administrator"
-	logging_config(stderr_level=logLevel, log_file=debugFile, file_level=LOG_DEBUG)
 
-	if target_os in ("linux", "macos") and paramiko is None:
-		message = (
-			"Could not import 'paramiko'. "
-			"Deploying to Linux/Macos not possible. "
-			"Please install paramiko through your package manager or pip."
-		)
-		logger.critical(message)
-		raise Exception(message)
-
-	additionalHostInfos = {}
-	if hostFile:
-		with open(hostFile, encoding="utf-8") as inputFile:
-			for line in inputFile:
+	additional_host_infos = {}
+	if host_file:
+		with open(host_file, encoding="utf-8") as input_file:
+			for line in input_file:
 				line = line.strip()
 				if not line or line.startswith('#') or line.startswith(';'):
 					continue
 
 				try:
 					host, description = line.split(None, 1)
-					additionalHostInfos[host] = {"description": description}
+					additional_host_infos[host] = {"description": description}
 				except ValueError as error:
 					logger.debug("Splitting line '%s' failed: %s", line, error)
 					host = line
-
 				hosts.append(forceUnicodeLower(host))
 
 	if not hosts:
-		raise Exception("No hosts given.")
+		raise ValueError("No hosts given.")
 
 	logger.debug('Deploying to the following hosts: %s', hosts)
 
@@ -77,7 +66,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		print("Password is required for deployment.")
 		password = forceUnicode(getpass.getpass())
 		if not password:
-			raise Exception("No password given.")
+			raise ValueError("No password given.")
 
 	for character in ('$', '§'):
 		if character in password:
@@ -88,32 +77,23 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 			break
 	secret_filter.add_secrets(password)
 
-	maxThreads = int(maxThreads)
-
-	if useIPAddress:
-		deploymentMethod = "ip"
-	elif useNetbios:
-		deploymentMethod = "hostname"
-	elif useFQDN:
-		deploymentMethod = "fqdn"
-	else:
-		deploymentMethod = "auto"
+	max_threads = int(max_threads)
 
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")
-		deploymentClass = WindowsDeployThread
+		DeploymentClass = WindowsDeployThread
 
-		if mountWithSmbclient:
+		if mount_with_smbclient:
 			logger.debug('Explicit check for smbclient.')
 			try:
-				which('smbclient')
-			except Exception as err:
-				raise Exception(f"Please make sure that 'smbclient' is installed: {err}") from err
+				execute("which smbclient")
+			except Exception as err:	# pylint: disable=broad-except
+				raise RuntimeError(f"Please make sure that 'smbclient' is installed: {err}") from err
 		elif os.getuid() != 0:
-			raise Exception("You have to be root to use mount.")
+			raise RuntimeError("You have to be root to use mount.")
 	else:
-		deploymentClass = PosixDeployThread
-		mountWithSmbclient = False
+		DeploymentClass = PosixDeployThread
+		mount_with_smbclient = False
 
 	if target_os == "linux":
 		logger.info("Deploying to Linux.")
@@ -140,55 +120,53 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	fails = 0
 	skips = 0
 
-	runningThreads = []
-	while hosts or runningThreads:
-		if hosts and len(runningThreads) < maxThreads:
+	running_threads = []
+	while hosts or running_threads:
+		if hosts and len(running_threads) < max_threads:
 			# start new thread
 			host = hosts.pop()
 
-			clientConfig = {
+			client_config = {
 				"host": host,
 				"backend": backend,
 				"username": username,
 				"password": password,
-				"shutdown": shutdown,
-				"reboot": reboot,
-				"startService": startService,
-				"deploymentMethod": deploymentMethod,
-				"stopOnPingFailure": stopOnPingFailure,
-				"skipExistingClient": skipExistingClient,
-				"mountWithSmbclient": mountWithSmbclient,
-				"keepClientOnFailure": keepClientOnFailure,
+				"finalize_action": finalize_action,
+				"deployment_method": deployment_method,
+				"stop_on_ping_failure": stop_on_ping_failure,
+				"skip_existing_client": skip_existing_client,
+				"mount_with_smbclient": mount_with_smbclient,
+				"keep_client_on_failure": keep_client_on_failure,
 				"depot": depot,
 				"group": group,
 			}
 
 			try:
-				clientConfig['additionalClientSettings'] = additionalHostInfos[host]
+				client_config['additional_client_settings'] = additional_host_infos[host]
 			except KeyError:
 				pass
 
 			if target_os in ("linux", "macos"):
-				clientConfig["sshPolicy"] = sshHostkeyPolicy or WARNING_POLICY
-				clientConfig["target_os"] = target_os
+				client_config["ssh_policy"] = ssh_hostkey_policy or paramiko.WarningPolicy
+				client_config["target_os"] = target_os
 
-			thread = deploymentClass(**clientConfig)
+			thread = DeploymentClass(**client_config)
 			total += 1
 			thread.daemon = True
 			thread.start()
-			runningThreads.append(thread)
+			running_threads.append(thread)
 			time.sleep(0.5)
 
-		newRunningThreads = []
-		for thread in runningThreads:
+		new_running_threads = []
+		for thread in running_threads:
 			if thread.is_alive():
-				newRunningThreads.append(thread)
+				new_running_threads.append(thread)
 			else:
 				if thread.success == SKIP_MARKER:
 					skips += 1
 				elif not thread.success:
 					fails += 1
-		runningThreads = newRunningThreads
+		running_threads = new_running_threads
 		time.sleep(1)
 
 	success = total - fails - skips
