@@ -105,9 +105,7 @@ class PosixDeployThread(DeployThread):
 			if self.target_os == "linux":
 				cmd = "systemctl start opsiclientd"
 			elif self.target_os == "macos":
-				cmd = "launchctl load /Library/LaunchDaemons/org.opsi.opsiclientd.plist"
-			else:
-				raise ValueError(f"invalid target os {self.target_os}")
+				cmd = "launchctl kickstart system/org.opsi.opsiclientd"
 		# default case is do nothing
 		try:
 			self._execute_via_ssh(cmd)
