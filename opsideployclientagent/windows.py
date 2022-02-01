@@ -21,7 +21,7 @@ from opsicommon.types import forceUnicode
 from opsideployclientagent.common import DeployThread, execute
 
 
-def winexe(cmd, host, username, password):
+def winexe(cmd, host, username, password, timeout=None):
 	cmd = forceUnicode(cmd)
 	host = forceUnicode(host)
 	username = forceUnicode(username)
@@ -47,8 +47,8 @@ def winexe(cmd, host, username, password):
 
 	credentials=username + '%' + password.replace("'", "'\"'\"'")
 	if logger.isEnabledFor(logging.DEBUG):
-		return execute(f"{executable} -d 9 -U '{credentials}' //{host} '{cmd}'")
-	return execute(f"{executable} -U '{credentials}' //{host} '{cmd}'")
+		return execute(f"{executable} -d 9 -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
+	return execute(f"{executable} -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
 
 class WindowsDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -138,7 +138,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice('Running installation script...')
 		try:
-			winexe(install_command, self.network_address, self.username, self.password)
+			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			raise Exception(f"Failed to install {self.product_id}: {err}") from err
 

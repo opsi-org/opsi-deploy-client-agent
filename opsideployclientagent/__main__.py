@@ -129,6 +129,9 @@ def parse_args(target_os):
 	parser.add_argument('--threads', '-t', dest="max_threads", default=1,
 						type=int,
 						help="number of concurrent deployment threads")
+	parser.add_argument('--install-timeout', default=None, type=float,
+						help="timeout for single threads (default is unlimited)")
+
 	parser.add_argument('--depot', help="Assign new clients to the given depot.")
 	parser.add_argument('--group', dest="group",
 						help="Assign fresh clients to an already existing group.")
@@ -197,7 +200,8 @@ def main():
 			stop_on_ping_failure=args.stop_on_ping_failure,
 			skip_existing_client=args.skip_existing_client,
 			keep_client_on_failure=args.keep_client_on_failure,
-			ssh_hostkey_policy=ssh_hostkey_policy
+			ssh_hostkey_policy=ssh_hostkey_policy,
+			install_timeout=args.install_timeout
 	)
 	sys.exit(returncode)
 

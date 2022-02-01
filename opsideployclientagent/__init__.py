@@ -33,7 +33,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	deployment_method="auto", mount_with_smbclient=True, depot=None, group=None,
 	finalize_action="start_service", username=None,
 	stop_on_ping_failure=False, skip_existing_client=False,
-	keep_client_on_failure=True, ssh_hostkey_policy=None
+	keep_client_on_failure=True, ssh_hostkey_policy=None, install_timeout=None
 ):
 
 	if target_os in ("linux", "macos") and username is None:
@@ -78,6 +78,8 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	secret_filter.add_secrets(password)
 
 	max_threads = int(max_threads)
+	if not install_timeout:
+		install_timeout = 3600  # an hour
 
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")
@@ -119,6 +121,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	total = 0
 	fails = 0
 	skips = 0
+	failed_clients = []
 
 	running_threads = []
 	while hosts or running_threads:
@@ -139,6 +142,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 				"keep_client_on_failure": keep_client_on_failure,
 				"depot": depot,
 				"group": group,
+				"install_timeout": install_timeout
 			}
 
 			try:
@@ -166,6 +170,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 					skips += 1
 				elif not thread.success:
 					fails += 1
+					failed_clients.append(thread.host)
 		running_threads = new_running_threads
 		time.sleep(1)
 
@@ -176,6 +181,8 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		logger.notice("%s/%s deployments skipped", skips, total)
 	if fails:
 		logger.warning("%s/%s deployments failed", fails, total)
+		for failed_client in failed_clients:
+			print(failed_client)
 
 	if fails:
 		return 1

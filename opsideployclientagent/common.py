@@ -90,7 +90,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		deployment_method="auto", stop_on_ping_failure=True,
 		skip_existing_client=False, mount_with_smbclient=True,
 		keep_client_on_failure=False, additional_client_settings=None,
-		depot=None, group=None
+		depot=None, group=None, install_timeout=None
 	):
 
 		threading.Thread.__init__(self)
@@ -122,6 +122,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.host = None
 		self.set_host_id(host)
 		self.host_object = None
+		self.install_timeout = install_timeout
 
 
 	def _detect_deployment_method(self, host):
@@ -395,6 +396,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 	def copy_data(self):
 		raise NotImplementedError
+
 
 	def run_installation(self, remote_folder):	# pylint: disable=unused-argument
 		raise NotImplementedError

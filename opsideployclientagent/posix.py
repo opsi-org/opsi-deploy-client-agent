@@ -87,7 +87,7 @@ class PosixDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice('Running installation script...')
 		logger.info('Executing %s', install_command)
-		self._execute_via_ssh(install_command)
+		self._execute_via_ssh(install_command, timeout=self.install_timeout)
 
 
 	def finalize(self):
@@ -140,7 +140,7 @@ class PosixDeployThread(DeployThread):
 		raise ValueError(f"invalid host {host}")
 
 
-	def _execute_via_ssh(self, command):
+	def _execute_via_ssh(self, command, timeout=None):
 		"""
 		Executing a command via SSH.
 
@@ -157,9 +157,8 @@ class PosixDeployThread(DeployThread):
 				command = f"sudo --stdin -- {command} < {self.credentialsfile}"
 		logger.info("Executing on remote: %s", command)
 
-		with closing(self._ssh_connection.get_transport().open_session()) as channel:
+		with closing(self._ssh_connection.get_transport().open_session(timeout=timeout)) as channel:
 			channel.set_combine_stderr(True)
-			channel.settimeout(None)  # blocking until completion of command
 
 			channel.exec_command(command)
 			exit_code = channel.recv_exit_status()
