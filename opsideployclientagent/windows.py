@@ -56,13 +56,13 @@ class WindowsDeployThread(DeployThread):
 		deployment_method="hostname", stop_on_ping_failure=True,
 		skip_existing_client=False, mount_with_smbclient=True,
 		keep_client_on_failure=False, additional_client_settings=None,
-		depot=None, group=None
+		depot=None, group=None, install_timeout=None
 	):
 		DeployThread.__init__(
 			self, host, backend, username, password, finalize_action,
 			deployment_method, stop_on_ping_failure,
 			skip_existing_client, mount_with_smbclient, keep_client_on_failure,
-			additional_client_settings, depot, group
+			additional_client_settings, depot, group, install_timeout
 		)
 
 		self.mount_point = None

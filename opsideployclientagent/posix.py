@@ -28,13 +28,13 @@ class PosixDeployThread(DeployThread):
 		deployment_method="hostname", stop_on_ping_failure=True,
 		skip_existing_client=False, mount_with_smbclient=True,
 		keep_client_on_failure=False, additional_client_settings=None,
-		depot=None, group=None, ssh_policy=paramiko.WarningPolicy
+		depot=None, group=None, ssh_policy=paramiko.WarningPolicy, install_timeout=None
 	):
 
 		DeployThread.__init__(self, host, backend, username, password,
 		finalize_action, deployment_method, stop_on_ping_failure,
 		skip_existing_client, mount_with_smbclient, keep_client_on_failure,
-		additional_client_settings, depot, group)
+		additional_client_settings, depot, group, install_timeout)
 
 		self.target_os = target_os
 		self._ssh_connection = None
