@@ -79,8 +79,6 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	secret_filter.add_secrets(password)
 
 	max_threads = int(max_threads)
-	if not install_timeout:
-		install_timeout = 3600  # an hour
 
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")

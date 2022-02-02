@@ -150,13 +150,12 @@ class WindowsDeployThread(DeployThread):
 		elif self.finalize_action == "shutdown":
 			logger.notice("Shutting down machine %s", self.network_address)
 			cmd = r'"shutdown.exe" /s /t 30 /c "opsi-client-agent installed - shutdown"'
-		elif self.finalize_action == "start_service":
-			logger.notice("Starting opsiclientd on computer %s", self.network_address)
-			cmd = 'net start opsiclientd'
+		# start_service is performed as last action of the setup.opsiscript
 		# default case is do nothing
 		if cmd:
 			try:
-				winexe(cmd, self.network_address, self.username, self.password)
+				# finalization is not allowed to take longer than 2 minutes
+				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
@@ -171,7 +170,8 @@ class WindowsDeployThread(DeployThread):
 		elif remote_folder:  # in case of clientside mount
 			try:
 				cmd = f'cmd.exe /C "del /s /q {remote_folder} && rmdir /s /q {remote_folder}'
-				winexe(cmd, self.network_address, self.username, self.password)
+				# cleanup is not allowed to take longer than 2 minutes
+				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.debug('Removing %s failed: %s', remote_folder, err, exc_info=True)
 
@@ -207,7 +207,8 @@ class WindowsDeployThread(DeployThread):
 		logger.notice("Testing winexe")
 		cmd = r'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
 		try:
-			winexe(cmd, self.network_address, self.username, self.password)
+			# cleanup is not allowed to take longer than 2 minutes
+			winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 		except Exception as err:  # pylint: disable=broad-except
 			if 'NT_STATUS_LOGON_FAILURE' in str(err):
 				logger.warning("Can't connect to %s: check your credentials", self.network_address)

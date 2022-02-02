@@ -100,23 +100,19 @@ class PosixDeployThread(DeployThread):
 		elif self.finalize_action == "shutdown":
 			logger.notice("Shutting down machine %s", self.network_address)
 			cmd = r'shutdown -h +1 & disown'
-		elif self.finalize_action == "start_service":
-			logger.notice("Starting opsiclientd on machine %s", self.network_address)
-			# setup should start opsiclientd - if not, start now
-			if self.target_os == "linux":
-				cmd = "systemctl start opsiclientd"
-			elif self.target_os == "macos":
-				cmd = "launchctl kickstart system/org.opsi.opsiclientd"
+		# start_service is performed as last action of the setup.opsiscript
 		# default case is do nothing
 		try:
-			self._execute_via_ssh(cmd)
+			# finalization is not allowed to take longer than 2 minutes
+			self._execute_via_ssh(cmd, timeout=120)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup(self, remote_folder):
 		try:
 			if remote_folder:  # remote_folder includes credentialsfile if any
-				self._execute_via_ssh(f"rm -rf {remote_folder}")
+				# cleanup is not allowed to take longer than 2 minutes
+				self._execute_via_ssh(f"rm -rf {remote_folder}", timeout=120)
 		except Exception:  # pylint: disable=broad-except
 			logger.error("Cleanup failed")
 
