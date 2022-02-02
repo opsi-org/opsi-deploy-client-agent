@@ -93,6 +93,7 @@ class PosixDeployThread(DeployThread):
 
 	def finalize(self):
 		# remove credentialsfile in 1min time window between call and execution of reboot/shutdown
+		cmd = ""
 		# TODO: shutdown blocks on macos until it is concluded -> error
 		if self.finalize_action == "reboot":
 			logger.notice("Rebooting machine %s", self.network_address)
@@ -102,11 +103,12 @@ class PosixDeployThread(DeployThread):
 			cmd = r'shutdown -h +1 & disown'
 		# start_service is performed as last action of the setup.opsiscript
 		# default case is do nothing
-		try:
-			# finalization is not allowed to take longer than 2 minutes
-			self._execute_via_ssh(cmd, timeout=120)
-		except Exception as err:  # pylint: disable=broad-except
-			logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
+		if cmd:
+			try:
+				# finalization is not allowed to take longer than 2 minutes
+				self._execute_via_ssh(cmd, timeout=120)
+			except Exception as err:  # pylint: disable=broad-except
+				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup(self, remote_folder):
 		try:
