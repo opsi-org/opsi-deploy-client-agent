@@ -21,12 +21,15 @@ from opsicommon.objects import OpsiClient, ProductOnClient
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import logger, secret_filter
 
+SKIP_MARKER = 'clientskipped'
+
+
 def get_product_id():
-	#return os.path.basename(os.getcwd())
+	# return os.path.basename(os.getcwd())
 	if getattr(sys, 'frozen', False):
-		workdir = os.path.dirname(os.path.abspath(sys.executable))	# for running as executable
+		workdir = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
 	else:
-		workdir = os.path.dirname(os.path.abspath(__file__))		# for running from python
+		workdir = os.path.dirname(os.path.abspath(__file__))  # for running from python
 	try:
 		os.chdir(workdir)
 	except Exception as error:
@@ -52,7 +55,6 @@ def execute(cmd, timeout=None):
 	# in case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
 	return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=timeout).decode("utf-8", errors="replace").split("\n")
 
-SKIP_MARKER = 'clientskipped'
 
 def _get_id_from_hostname(host, host_ip=None):
 	host = host.replace('_', '-')
@@ -64,7 +66,7 @@ def _get_id_from_hostname(host, host_ip=None):
 
 			try:
 				if host_ip == forceIPAddress(host):  # Lookup did not succeed
-					host = host_before		# Falling back to hopefully valid hostname
+					host = host_before  # Falling back to hopefully valid hostname
 			except ValueError:
 				pass  # no IP - great!
 			except NameError:
@@ -81,8 +83,10 @@ def _get_id_from_hostname(host, host_ip=None):
 	logger.info("Got host_id %s", host_id)
 	return host_id
 
+
 class SkipClientException(Exception):
 	pass
+
 
 class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -92,7 +96,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		keep_client_on_failure=False, additional_client_settings=None,
 		depot=None, group=None, install_timeout=None
 	):
-
 		threading.Thread.__init__(self)
 
 		self.success = False
@@ -124,7 +127,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.host_object = None
 		self.install_timeout = install_timeout
 
-
 	def _detect_deployment_method(self, host):
 		if '.' not in host:
 			logger.debug("No dots in host. Assuming hostname.")
@@ -139,10 +141,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.debug("Not a valid IP. Assuming FQDN.")
 			self.deployment_method = "fqdn"
 
-
 	def ask_host_for_hostname(self, host):
 		raise NotImplementedError
-
 
 	def set_host_id(self, host):
 		host_ip = None
@@ -162,7 +162,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if not self.host:
 			raise ValueError(f"invalid host {host}")
 
-
 	def _check_if_client_should_be_skipped(self):
 		if self.backend.host_getIdents(type='OpsiClient', id=self.host) and self.skip_existing_client:
 			raise SkipClientException(f"Client {self.host} exists.")
@@ -170,7 +169,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if self.backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=self.host):
 			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", self.host)
 			raise SkipClientException(f"Not deploying to server {self.host}.")
-
 
 	def _get_ip_address(self, host_id, host_name):
 		if self.deployment_method == 'ip':
@@ -200,7 +198,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 		return ip_address
 
-
 	def _ping_client(self, ip_address):
 		logger.notice("Pinging host %s ...", ip_address)
 		alive = False
@@ -216,7 +213,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			raise Exception(f"No ping response received from {ip_address}")
 		else:
 			logger.warning("No ping response received from %s", ip_address)
-
 
 	def _create_host_if_not_existing(self, host_id, ip_address):
 		if not self.backend.host_getIdents(type='OpsiClient', id=host_id):
@@ -240,7 +236,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self.backend.host_createObjects([OpsiClient(**client_config)])
 			self._client_created_by_script = True
 
-
 	def _put_client_into_group(self, client_id):
 		if not self.group:
 			return
@@ -257,7 +252,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Adding %s to group %s failed: %s", client_id, self.group, err)
 
-
 	def _assign_client_to_depot(self, client_id):
 		if not self.depot:
 			return
@@ -273,7 +267,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.notice("Assigned %s to depot %s", client_id, self.depot)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Assgining %s to depot %s failed: %s", client_id, self.depot, err)
-
 
 	@staticmethod
 	def _get_mac_address(ip_address):
@@ -294,13 +287,11 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.notice("Found hardware ethernet address %s", mac)
 		return mac
 
-
 	@property
 	def network_address(self):
 		if self._network_address is None:
 			raise ValueError("No network address set!")
 		return self._network_address
-
 
 	def _set_network_address(self, host_id, host_name, ip_address):
 		if self.deployment_method == 'hostname':
@@ -309,7 +300,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self._network_address = host_id
 		else:
 			self._network_address = ip_address
-
 
 	def _set_client_agent_to_installing(self, host_id, product_id):
 		poc = ProductOnClient(
@@ -322,14 +312,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		)
 		self.backend.productOnClient_updateObjects([poc])
 
-
 	def _remove_host_from_backend(self, host):
 		try:
 			logger.notice("Deleting client %s from backend", host)
 			self.backend.host_deleteObjects([host])
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error(err)
-
 
 	def _get_service_address(self, host_id):
 		service_configstate = self.backend.configState_getObjects(configId='clientconfig.configserver.url', objectId=host_id)
@@ -340,14 +328,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			return service_config[0].defaultValues[0]
 		raise ValueError("Could not determine associated configservice url")
 
-
 	def evaluate_success(self):
 		product_on_client = self.backend.productOnClient_getObjects(productId=self.product_id, clientId=self.host)
 		if not product_on_client or not product_on_client[0]:
 			raise ValueError(f"Product {self.product_id} not found on client {self.host}")
 		if not product_on_client[0].installationStatus == "installed":
 			raise ValueError(f"Installation of {self.product_id} on client {self.host} unsuccessful")
-
 
 	def prepare_deploy(self):
 		host_name = self.host.split('.')[0]
@@ -362,7 +348,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.host_object = self.backend.host_getObjects(type='OpsiClient', id=self.host)[0]
 		secret_filter.add_secrets(self.host_object.opsiHostKey)
 
-
 	def run(self):
 		try:
 			logger.debug("Checking if client should be skipped")
@@ -374,17 +359,17 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 		logger.notice("Starting deployment to host %s", self.host)
 		self.prepare_deploy()
-		remote_folder=None
+		remote_folder = None
 		try:
 			remote_folder = self.copy_data()
 			logger.notice("Installing %s", self.product_id)
 			self.run_installation(remote_folder)
 			logger.debug("Evaluating success")
-			self.evaluate_success()		# throws Exception if fail
+			self.evaluate_success()  # throws Exception if fail
 			logger.info("Finalizing deployment")
 			self.finalize()
 			self.success = True
-		except Exception as error:		# pylint: disable=broad-except
+		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Deployment to %s failed: %s", self.host, error)
 			self.success = False
 
@@ -393,18 +378,14 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		finally:
 			self.cleanup(remote_folder)
 
-
 	def copy_data(self):
 		raise NotImplementedError
 
-
-	def run_installation(self, remote_folder):	# pylint: disable=unused-argument
+	def run_installation(self, remote_folder):  # pylint: disable=unused-argument
 		raise NotImplementedError
-
 
 	def finalize(self):
 		raise NotImplementedError
 
-
-	def cleanup(self, remote_folder):			# pylint: disable=unused-argument
+	def cleanup(self, remote_folder):  # pylint: disable=unused-argument
 		raise NotImplementedError

@@ -36,10 +36,11 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	keep_client_on_failure=True, ssh_hostkey_policy=None, install_timeout=None
 ):
 
-	if target_os in ("linux", "macos") and username is None:
-		username = "root"
-	if not target_os in ("linux", "macos") and username is None:
-		username = "Administrator"
+	if username is None:
+		if target_os in ("linux", "macos"):
+			username = "root"
+		else:
+			username = "Administrator"
 
 	additional_host_infos = {}
 	if host_file:
@@ -89,7 +90,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 			logger.debug('Explicit check for smbclient.')
 			try:
 				execute("which smbclient")
-			except Exception as err:	# pylint: disable=broad-except
+			except Exception as err:  # pylint: disable=broad-except
 				raise RuntimeError(f"Please make sure that 'smbclient' is installed: {err}") from err
 		elif os.getuid() != 0:
 			raise RuntimeError("You have to be root to use mount.")

@@ -19,8 +19,10 @@ from opsicommon.logging import logger
 
 from opsideployclientagent.common import DeployThread
 
+
 class SSHRemoteExecutionException(Exception):
 	pass
+
 
 class PosixDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
@@ -31,16 +33,17 @@ class PosixDeployThread(DeployThread):
 		depot=None, group=None, ssh_policy=paramiko.WarningPolicy, install_timeout=None
 	):
 
-		DeployThread.__init__(self, host, backend, username, password,
-		finalize_action, deployment_method, stop_on_ping_failure,
-		skip_existing_client, mount_with_smbclient, keep_client_on_failure,
-		additional_client_settings, depot, group, install_timeout)
+		DeployThread.__init__(
+			self, host, backend, username, password,
+			finalize_action, deployment_method, stop_on_ping_failure,
+			skip_existing_client, mount_with_smbclient, keep_client_on_failure,
+			additional_client_settings, depot, group, install_timeout
+		)
 
 		self.target_os = target_os
 		self._ssh_connection = None
 		self._ssh_policy = ssh_policy
 		self.credentialsfile = None
-
 
 	def copy_data(self):
 		remote_folder = os.path.join('/tmp', 'opsi-client-agent')
@@ -58,7 +61,6 @@ class PosixDeployThread(DeployThread):
 		self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(remote_folder, 'setup.opsiscript'))
 		self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(remote_folder, 'oca-installation-helper'))
 		return remote_folder
-
 
 	def run_installation(self, remote_folder):
 		if self.target_os == "linux":
@@ -89,10 +91,9 @@ class PosixDeployThread(DeployThread):
 		logger.info('Executing %s', install_command)
 		self._execute_via_ssh(install_command, timeout=self.install_timeout)
 
-
 	def finalize(self):
 		# remove credentialsfile in 1min time window between call and execution of reboot/shutdown
-		#TODO: shutdown blocks on macos until it is concluded -> error
+		# TODO: shutdown blocks on macos until it is concluded -> error
 		if self.finalize_action == "reboot":
 			logger.notice("Rebooting machine %s", self.network_address)
 			cmd = r'shutdown -r +1 & disown'
@@ -112,10 +113,9 @@ class PosixDeployThread(DeployThread):
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-
 	def cleanup(self, remote_folder):
 		try:
-			if remote_folder:		#remote_folder includes credentialsfile if any
+			if remote_folder:  # remote_folder includes credentialsfile if any
 				self._execute_via_ssh(f"rm -rf {remote_folder}")
 		except Exception:  # pylint: disable=broad-except
 			logger.error("Cleanup failed")
@@ -126,19 +126,17 @@ class PosixDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.trace("Closing SSH connection failed: %s", err)
 
-
 	def ask_host_for_hostname(self, host):
 		if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', host):
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(self._ssh_policy())
 			ssh.connect(host, "22", self.username, self.password)
 			_, stdout, _ = ssh.exec_command("hostname -f")
-			host_id = stdout.readlines()[0].encode('ascii','ignore').strip()
+			host_id = stdout.readlines()[0].encode('ascii', 'ignore').strip()
 			logger.info("resolved FQDN: %s (type %s)", host_id, type(host_id))
 		if host_id:
 			return host_id
 		raise ValueError(f"invalid host {host}")
-
 
 	def _execute_via_ssh(self, command, timeout=None):
 		"""
@@ -173,7 +171,6 @@ class PosixDeployThread(DeployThread):
 			)
 		return out
 
-
 	def _connect_via_ssh(self):
 		if self._ssh_connection is not None:
 			return
@@ -188,7 +185,6 @@ class PosixDeployThread(DeployThread):
 			username=self.username,
 			password=self.password
 		)
-
 
 	def _copy_over_ssh(self, local_path, remote_path):
 		@contextmanager
