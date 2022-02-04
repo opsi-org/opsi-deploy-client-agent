@@ -39,7 +39,9 @@ def write_failed_clients(clients):
 		FAILED_CLIENTS_FILE.rename(FAILED_CLIENTS_FILE.with_suffix(".prev"))
 	logger.notice("writing list of failed clients to file %s", FAILED_CLIENTS_FILE, )
 	with open(FAILED_CLIENTS_FILE, "w", encoding="utf-8") as fcfile:
-		fcfile.writelines(clients)
+		for client in clients:
+			print(client)
+			fcfile.write(client + "\n")
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
@@ -195,7 +197,5 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	if fails:
 		logger.warning("%s/%s deployments failed", fails, total)
 		write_failed_clients(failed_clients)
-		for failed_client in failed_clients:
-			print(failed_client)
 		return 1
 	return 0
