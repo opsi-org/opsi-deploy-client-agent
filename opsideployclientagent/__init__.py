@@ -16,16 +16,27 @@ __version__ = '4.2.0.14'
 import getpass
 import os
 import time
+from pathlib import Path
 import paramiko
 
 from OPSI.Backend.BackendManager import BackendManager
-
 from opsicommon.logging import logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
 
 from opsideployclientagent.common import SKIP_MARKER, execute
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
+
+FAILED_CLIENTS_FILE = Path("/tmp/deploy_failed_clients.txt")
+
+
+def write_failed_clients(clients):
+	if (FAILED_CLIENTS_FILE / ".prev").exists():
+		(FAILED_CLIENTS_FILE / ".prev").unlink()
+	if FAILED_CLIENTS_FILE.exists():
+		FAILED_CLIENTS_FILE.rename(FAILED_CLIENTS_FILE / ".prev")
+	with open(FAILED_CLIENTS_FILE, "w", encoding="utf-8") as fcfile:
+		fcfile.writelines(clients)
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
@@ -180,9 +191,8 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		logger.notice("%s/%s deployments skipped", skips, total)
 	if fails:
 		logger.warning("%s/%s deployments failed", fails, total)
+		write_failed_clients(failed_clients)
 		for failed_client in failed_clients:
 			print(failed_client)
-
-	if fails:
 		return 1
 	return 0
