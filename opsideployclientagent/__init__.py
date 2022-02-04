@@ -32,9 +32,12 @@ FAILED_CLIENTS_FILE = Path("/tmp/deploy_failed_clients.txt")
 
 def write_failed_clients(clients):
 	if (FAILED_CLIENTS_FILE / ".prev").exists():
+		logger.info("deleting file %s", (FAILED_CLIENTS_FILE / ".prev"))
 		(FAILED_CLIENTS_FILE / ".prev").unlink()
 	if FAILED_CLIENTS_FILE.exists():
+		logger.info("moving file %s to %s", FAILED_CLIENTS_FILE, (FAILED_CLIENTS_FILE / ".prev"))
 		FAILED_CLIENTS_FILE.rename(FAILED_CLIENTS_FILE / ".prev")
+	logger.notice("writing list of failed clients to file %s", FAILED_CLIENTS_FILE, )
 	with open(FAILED_CLIENTS_FILE, "w", encoding="utf-8") as fcfile:
 		fcfile.writelines(clients)
 
