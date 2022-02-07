@@ -31,9 +31,9 @@ from opsideployclientagent.windows import WindowsDeployThread
 
 def write_failed_clients(clients: List[str], failed_clients_file: Path) -> None:
 	if failed_clients_file.exists():
-		logger.info("deleting file %s", failed_clients_file)
+		logger.info("Deleting file %s", failed_clients_file)
 		failed_clients_file.unlink()
-	logger.notice("writing list of failed clients to file %s", failed_clients_file)
+	logger.notice("Writing list of failed clients to file %s", failed_clients_file)
 	with open(failed_clients_file, "w", encoding="utf-8") as fcfile:
 		for client in clients:
 			fcfile.write(client + "\n")
@@ -196,6 +196,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		logger.notice("%s/%s deployments skipped", skips, total)
 	if fails:
 		logger.warning("%s/%s deployments failed", fails, total)
-		write_failed_clients(failed_clients, failed_clients_file)
+		if failed_clients_file:
+			write_failed_clients(failed_clients, failed_clients_file)
 		return 1
 	return 0
