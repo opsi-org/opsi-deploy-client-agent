@@ -15,11 +15,12 @@ __version__ = '4.2.0.14'
 
 import getpass
 import os
+from typing import List
 import time
+from pathlib import Path
 import paramiko
 
 from OPSI.Backend.BackendManager import BackendManager
-
 from opsicommon.logging import logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
 
@@ -28,12 +29,41 @@ from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
 
+def write_failed_clients(clients: List[str], failed_clients_file: Path) -> None:
+	if failed_clients_file.exists():
+		logger.info("Deleting file %s", failed_clients_file)
+		failed_clients_file.unlink()
+	logger.notice("Writing list of failed clients to file %s", failed_clients_file)
+	with open(failed_clients_file, "w", encoding="utf-8") as fcfile:
+		for client in clients:
+			fcfile.write(client + "\n")
+
+
+def get_password(password: str) -> str:
+	if not password:
+		print("Password is required for deployment.")
+		password = forceUnicode(getpass.getpass())
+		if not password:
+			raise ValueError("No password given.")
+
+	for character in ('$', '§'):
+		if character in password:
+			logger.warning(
+				"Please be aware that special characters in passwords may result "
+				"in incorrect behaviour."
+			)
+			break
+	secret_filter.add_secrets(password)
+	return password
+
+
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
 	hosts, target_os, host_file=None, password=None, max_threads=1,
 	deployment_method="auto", mount_with_smbclient=True, depot=None, group=None,
 	finalize_action="start_service", username=None,
 	stop_on_ping_failure=False, skip_existing_client=False,
-	keep_client_on_failure=True, ssh_hostkey_policy=None, install_timeout=None
+	keep_client_on_failure=True, ssh_hostkey_policy=None,
+	install_timeout=None, failed_clients_file=None
 ):
 
 	if username is None:
@@ -63,21 +93,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 
 	logger.debug('Deploying to the following hosts: %s', hosts)
 
-	if not password:
-		print("Password is required for deployment.")
-		password = forceUnicode(getpass.getpass())
-		if not password:
-			raise ValueError("No password given.")
-
-	for character in ('$', '§'):
-		if character in password:
-			logger.warning(
-				"Please be aware that special characters in passwords may result "
-				"in incorrect behaviour."
-			)
-			break
-	secret_filter.add_secrets(password)
-
+	password = get_password(password)
 	max_threads = int(max_threads)
 
 	if target_os == "windows":
@@ -180,9 +196,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		logger.notice("%s/%s deployments skipped", skips, total)
 	if fails:
 		logger.warning("%s/%s deployments failed", fails, total)
-		for failed_client in failed_clients:
-			print(failed_client)
-
-	if fails:
+		if failed_clients_file:
+			write_failed_clients(failed_clients, failed_clients_file)
 		return 1
 	return 0
