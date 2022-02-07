@@ -30,6 +30,7 @@ installed via opsi.
 """
 import sys
 import argparse
+from pathlib import Path
 import paramiko
 
 from opsicommon import __version__ as python_opsi_common_version
@@ -181,6 +182,7 @@ def parse_args(target_os):
 		'--remove-client-on-failure', dest="keep_client_on_failure", action="store_false",
 		help="If the client was created in opsi through this script it will be removed in case of failure."
 	)
+	parser.add_argument("--failed-clients-file", help="filename to store list of failed clients in")
 	parser.add_argument('host', nargs='*', help='The hosts to deploy the opsi-client-agent to.')
 
 	args = parser.parse_args()
@@ -221,7 +223,8 @@ def main():
 		skip_existing_client=args.skip_existing_client,
 		keep_client_on_failure=args.keep_client_on_failure,
 		ssh_hostkey_policy=ssh_hostkey_policy,
-		install_timeout=args.install_timeout
+		install_timeout=args.install_timeout,
+		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None
 	)
 	sys.exit(returncode)
 
