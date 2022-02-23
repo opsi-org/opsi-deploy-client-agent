@@ -13,7 +13,8 @@ url = "https://pypi.uib.gmbh/simple/"
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.11"
-python-opsi = "^4.2.0.275"
+python-opsi = "^4.2.0.274"
+python-opsi-common = "^4.2.0.275"
 paramiko = "^2.9"
 
 [tool.poetry.dev-dependencies]
