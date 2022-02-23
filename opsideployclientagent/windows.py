@@ -97,7 +97,11 @@ class WindowsDeployThread(DeployThread):
 	def copy_data_clientside_mount(self):
 		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-		smbclient_cmd = execute("which smbclient")[0]
+		smbclient_cmd = shutil.which('smbclient')
+		if not smbclient_cmd:
+			logger.critical("Unable to find 'smbclient'.")
+			raise RuntimeError("Command 'smbclient' not found in PATH")
+
 		cmd = (
 			f"{smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
 			" -c 'prompt; recurse;"
@@ -111,7 +115,10 @@ class WindowsDeployThread(DeployThread):
 		self.mount_point = tempfile.TemporaryDirectory().name  # pylint: disable=consider-using-with
 
 		logger.notice("Mounting c$ share")
-		mount_cmd = execute("which mount")[0]
+		mount_cmd = shutil.which("mount")
+		if not mount_cmd:
+			logger.critical("Unable to find 'mount'.")
+			raise RuntimeError("Command 'mount' not found in PATH")
 		try:
 			password = self.password.replace("'", "'\"'\"'")
 			try:
