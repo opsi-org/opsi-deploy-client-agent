@@ -31,11 +31,10 @@ def winexe(cmd, host, username, password, timeout=None):
 	if match:
 		username = match.group(1) + r"\\" + match.group(2)
 
-	try:
-		executable = execute("which winexe")[0]
-	except Exception as err:  # pylint: disable=broad-except
-		logger.critical("Unable to find 'winexe'. Please install 'opsi-windows-support' " "through your operating systems package manager!")
-		raise RuntimeError("Missing 'winexe'") from err
+	executable = shutil.which("winexe")
+	if not executable:
+		logger.critical("Unable to find 'winexe'. Please install 'opsi-windows-support' through your operating systems package manager!")
+		raise RuntimeError("Command 'winexe' not found in PATH")
 
 	try:
 		logger.info("Winexe Version: %s", execute(f"{executable} -V")[0])

@@ -16,6 +16,7 @@ import re
 import os
 import sys
 import subprocess
+from typing import List
 
 from opsicommon.objects import OpsiClient, ProductOnClient  # type: ignore[import]
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId  # type: ignore[import]
@@ -50,11 +51,11 @@ def get_product_id():
 	return product_id
 
 
-def execute(cmd, timeout=None):
+def execute(cmd: str, timeout: int = None) -> List[str]:
 	logger.info("executing %s", cmd)
 	if timeout:
-		logger.info("timeout is %s s", timeout)
-	# in case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
+		logger.info("timeout is %s seconds", timeout)
+	# In case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
 	return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=timeout).decode("utf-8", errors="replace").split("\n")
 
 
