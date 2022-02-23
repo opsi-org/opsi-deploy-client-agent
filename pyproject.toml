@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "opsi-deploy-client-agent"
-version = "4.2.0.17"
+version = "4.2.0.18"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 homepage = "https://www.opsi.org"
 license = "AGPL-3.0"
