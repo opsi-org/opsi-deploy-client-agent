@@ -18,11 +18,11 @@ import os
 from typing import List
 import time
 from pathlib import Path
-import paramiko
+import paramiko  # type: ignore[import]
 
-from OPSI.Backend.BackendManager import BackendManager
-from opsicommon.logging import logger, secret_filter
-from opsicommon.types import forceUnicode, forceUnicodeLower
+from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
+from opsicommon.logging import logger, secret_filter  # type: ignore[import]
+from opsicommon.types import forceUnicode, forceUnicodeLower  # type: ignore[import]
 
 from opsideployclientagent.common import SKIP_MARKER, execute
 from opsideployclientagent.posix import PosixDeployThread

@@ -11,21 +11,27 @@ maintainers = ["uib GmbH <info@uib.de>"]
 name = "uib"
 url = "https://pypi.uib.gmbh/simple/"
 
-
-
 [tool.poetry.dependencies]
-python = "^3.7,<3.11"
-python-opsi = "^4.2.0"
-#python-opsi = {path = "../python-opsi"}
-paramiko = "^2.7.2"
-python-opsi-common = "^4.2.0"
+python = ">=3.7,<3.11"
+python-opsi = "^4.2.0.273"
+paramiko = "^2.9"
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.2"
-opsi-dev-tools = "^1.0.43"
-pyinstaller = "^4.0"
-pylint = "^2.6.0"
-flake8 = "^4.0.1"
+pytest = "^7.0"
+opsi-dev-tools = "^1.1"
+pyinstaller = "^4.9"
+pylint = "^2.12"
+tan = "^22.2"
+flake8 = "^4.0"
+mypy = "^0.931"
+
+[tool.poetry.scripts]
+opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
+
+[tool.black]
+line-length = 140
+target-version = ['py39', 'py310']
+use-tabs = true
 
 [build-system]
 requires = ["poetry>=0.12"]

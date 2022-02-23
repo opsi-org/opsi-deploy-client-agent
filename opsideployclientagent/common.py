@@ -17,9 +17,9 @@ import os
 import sys
 import subprocess
 
-from opsicommon.objects import OpsiClient, ProductOnClient
-from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
-from opsicommon.logging import logger, secret_filter
+from opsicommon.objects import OpsiClient, ProductOnClient  # type: ignore[import]
+from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId  # type: ignore[import]
+from opsicommon.logging import logger, secret_filter  # type: ignore[import]
 
 SKIP_MARKER = 'clientskipped'
 
