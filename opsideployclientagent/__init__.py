@@ -29,7 +29,7 @@ from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
 
-def write_failed_clients(clients: Dict[str,str], failed_clients_file: Path) -> None:
+def write_failed_clients(clients: Dict[str, str], failed_clients_file: Path) -> None:
 	if failed_clients_file.name == "console":
 		for client, reason in clients.items():
 			print(f"{client}\t{reason}")
@@ -189,7 +189,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 					skips += 1
 				elif thread.result != "success":
 					fails += 1
-					failed_clients.update({thread.host, thread.result})
+					failed_clients.update({thread.host: thread.result})
 		running_threads = new_running_threads
 		time.sleep(1)
 

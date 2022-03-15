@@ -140,7 +140,8 @@ class WindowsDeployThread(DeployThread):
 		try:
 			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
-			raise Exception(f"Failed to install {self.product_id}: {err}") from err
+			logger.error("Failed to install %s: %s", self.product_id, err)
+			raise
 
 	def finalize(self):
 		cmd = ""

@@ -95,6 +95,7 @@ class ProductNotFound(Exception):
 class InstallationUnsuccessful(Exception):
 	pass
 
+
 class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self, host, backend, username, password, finalize_action="start_service",
@@ -105,7 +106,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	):
 		threading.Thread.__init__(self)
 
-		self.result = None
+		self.result = "noattempt"
 
 		self.backend = backend
 		self.username = username
@@ -368,26 +369,30 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.prepare_deploy()
 		remote_folder = None
 		try:
-			remote_folder = self.copy_data()
-			logger.notice("Installing %s", self.product_id)
-			self.run_installation(remote_folder)
-			logger.debug("Evaluating success")
-			self.evaluate_success()  # throws Exception if fail
-			logger.info("Finalizing deployment")
-			self.finalize()
-			self.result = "success"
+			try:
+				remote_folder = self.copy_data()
+				logger.notice("Installing %s", self.product_id)
+				self.run_installation(remote_folder)
+				logger.debug("Evaluating success")
+				self.evaluate_success()  # throws Exception if fail
+				logger.info("Finalizing deployment")
+				self.finalize()
+				self.result = "success"
+			except InstallationUnsuccessful:
+				self.result = "failed:installationunsuccessful"
+				raise
+			except ProductNotFound:
+				self.result = "failed:productnotfound"
+				raise
+			except subprocess.TimeoutExpired:
+				self.result = "failed:timeout"
+				raise
 		except Exception as error:  # pylint: disable=broad-except
+			if self.result == "noattempt":
+				self.result = "failed:unknownreason"
 			logger.error("Deployment to %s failed: %s", self.host, error)
 			if self._client_created_by_script and self.host_object and not self.keep_client_on_failure:
 				self._remove_host_from_backend(self.host_object)
-			if isinstance(error, InstallationUnsuccessful):
-				self.result = "failed:installationunsuccessful"
-			elif isinstance(error, ProductNotFound):
-				self.result = "failed:productnotfound"
-			elif isinstance(error, subprocess.TimeoutExpired):
-				self.result = "failed:timeoutexpired"
-			else:
-				self.result = "failed:unknownreason"
 
 		finally:
 			self.cleanup(remote_folder)
