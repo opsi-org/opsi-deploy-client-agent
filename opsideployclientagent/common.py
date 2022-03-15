@@ -21,8 +21,6 @@ from opsicommon.objects import OpsiClient, ProductOnClient
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import logger, secret_filter
 
-SKIP_MARKER = 'clientskipped'
-
 
 def get_product_id():
 	# return os.path.basename(os.getcwd())
@@ -90,6 +88,13 @@ class SkipClientException(Exception):
 	pass
 
 
+class ProductNotFound(Exception):
+	pass
+
+
+class InstallationUnsuccessful(Exception):
+	pass
+
 class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self, host, backend, username, password, finalize_action="start_service",
@@ -100,7 +105,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	):
 		threading.Thread.__init__(self)
 
-		self.success = False
+		self.result = None
 
 		self.backend = backend
 		self.username = username
@@ -333,9 +338,9 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	def evaluate_success(self):
 		product_on_client = self.backend.productOnClient_getObjects(productId=self.product_id, clientId=self.host)
 		if not product_on_client or not product_on_client[0]:
-			raise ValueError(f"Product {self.product_id} not found on client {self.host}")
+			raise ProductNotFound(f"Product {self.product_id} not found on client {self.host}")
 		if not product_on_client[0].installationStatus == "installed":
-			raise ValueError(f"Installation of {self.product_id} on client {self.host} unsuccessful")
+			raise InstallationUnsuccessful(f"Installation of {self.product_id} on client {self.host} unsuccessful")
 
 	def prepare_deploy(self):
 		host_name = self.host.split('.')[0]
@@ -356,7 +361,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self._check_if_client_should_be_skipped()
 		except SkipClientException as skip:
 			logger.notice("Skipping host %s: %s", self.host, skip)
-			self.success = SKIP_MARKER
+			self.result = "clientskipped"
 			return
 
 		logger.notice("Starting deployment to host %s", self.host)
@@ -370,13 +375,20 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self.evaluate_success()  # throws Exception if fail
 			logger.info("Finalizing deployment")
 			self.finalize()
-			self.success = True
+			self.result = "success"
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Deployment to %s failed: %s", self.host, error)
-			self.success = False
-
 			if self._client_created_by_script and self.host_object and not self.keep_client_on_failure:
 				self._remove_host_from_backend(self.host_object)
+			if isinstance(error, InstallationUnsuccessful):
+				self.result = "failed:installationunsuccessful"
+			elif isinstance(error, ProductNotFound):
+				self.result = "failed:productnotfound"
+			elif isinstance(error, subprocess.TimeoutExpired):
+				self.result = "failed:timeoutexpired"
+			else:
+				self.result = "failed:unknownreason"
+
 		finally:
 			self.cleanup(remote_folder)
 
