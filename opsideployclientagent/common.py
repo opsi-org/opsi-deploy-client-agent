@@ -19,7 +19,7 @@ import subprocess
 
 from opsicommon.objects import OpsiClient, ProductOnClient
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
-from opsicommon.logging import logger, secret_filter
+from opsicommon.logging import logger, secret_filter, log_context
 
 
 def get_product_id():
@@ -93,6 +93,10 @@ class ProductNotFound(Exception):
 
 
 class InstallationUnsuccessful(Exception):
+	pass
+
+
+class FiletransferUnsuccessful(Exception):
 	pass
 
 
@@ -357,45 +361,49 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		secret_filter.add_secrets(self.host_object.opsiHostKey)
 
 	def run(self):
-		try:
-			logger.debug("Checking if client should be skipped")
-			self._check_if_client_should_be_skipped()
-		except SkipClientException as skip:
-			logger.notice("Skipping host %s: %s", self.host, skip)
-			self.result = "clientskipped"
-			return
-
-		logger.notice("Starting deployment to host %s", self.host)
-		self.prepare_deploy()
-		remote_folder = None
-		try:
+		with log_context({"client": self.host}):
 			try:
-				remote_folder = self.copy_data()
-				logger.notice("Installing %s", self.product_id)
-				self.run_installation(remote_folder)
-				logger.debug("Evaluating success")
-				self.evaluate_success()  # throws Exception if fail
-				logger.info("Finalizing deployment")
-				self.finalize()
-				self.result = "success"
-			except InstallationUnsuccessful:
-				self.result = "failed:installationunsuccessful"
-				raise
-			except ProductNotFound:
-				self.result = "failed:productnotfound"
-				raise
-			except subprocess.TimeoutExpired:
-				self.result = "failed:timeout"
-				raise
-		except Exception as error:  # pylint: disable=broad-except
-			if self.result == "noattempt":
-				self.result = "failed:unknownreason"
-			logger.error("Deployment to %s failed: %s", self.host, error)
-			if self._client_created_by_script and self.host_object and not self.keep_client_on_failure:
-				self._remove_host_from_backend(self.host_object)
+				logger.debug("Checking if client should be skipped")
+				self._check_if_client_should_be_skipped()
+			except SkipClientException as skip:
+				logger.notice("Skipping host %s: %s", self.host, skip)
+				self.result = "clientskipped"
+				return
 
-		finally:
-			self.cleanup(remote_folder)
+			logger.notice("Starting deployment to host %s", self.host)
+			self.prepare_deploy()
+			remote_folder = None
+			try:
+				try:
+					remote_folder = self.copy_data()
+					logger.notice("Installing %s", self.product_id)
+					self.run_installation(remote_folder)
+					logger.debug("Evaluating success")
+					self.evaluate_success()  # throws Exception if fail
+					logger.info("Finalizing deployment")
+					self.finalize()
+					self.result = "success"
+				except FiletransferUnsuccessful:
+					self.result = "failed:filetransferunsuccessful"
+					raise
+				except InstallationUnsuccessful:
+					self.result = "failed:installationunsuccessful"
+					raise
+				except ProductNotFound:
+					self.result = "failed:productnotfound"
+					raise
+				except subprocess.TimeoutExpired:
+					self.result = "failed:timeout"
+					raise
+			except Exception as error:  # pylint: disable=broad-except
+				if self.result == "noattempt":
+					self.result = "failed:unknownreason"
+				logger.error("Deployment to %s failed: %s", self.host, error)
+				if self._client_created_by_script and self.host_object and not self.keep_client_on_failure:
+					self._remove_host_from_backend(self.host_object)
+
+			finally:
+				self.cleanup(remote_folder)
 
 	def copy_data(self):
 		raise NotImplementedError

@@ -18,7 +18,7 @@ import tempfile
 from opsicommon.logging import logger
 from opsicommon.types import forceUnicode
 
-from opsideployclientagent.common import DeployThread, execute
+from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
 
 
 def winexe(cmd, host, username, password, timeout=None):
@@ -71,11 +71,15 @@ class WindowsDeployThread(DeployThread):
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
-		if self.mount_with_smbclient:
-			logger.debug('Installing using client-side mount.')
-			return self.copy_data_clientside_mount()
-		logger.debug('Installing using server-side mount.')
-		return self.copy_data_serverside_mount()
+		try:
+			if self.mount_with_smbclient:
+				logger.debug('Installing using client-side mount.')
+				return self.copy_data_clientside_mount()
+			logger.debug('Installing using server-side mount.')
+			return self.copy_data_serverside_mount()
+		except Exception as error:  # pylint: disable=broad-except
+			logger.error("Failed to copy installation files: %s", error, exc_info=True)
+			raise FiletransferUnsuccessful from error
 
 	def copy_data_clientside_mount(self):
 		credentials = self.username + '%' + self.password.replace("'", "'\"'\"'")

@@ -15,7 +15,7 @@ __version__ = '4.2.0.14'
 
 import getpass
 import os
-from typing import Dict, List
+from typing import Dict
 import time
 from pathlib import Path
 import paramiko

@@ -17,7 +17,7 @@ import paramiko
 
 from opsicommon.logging import logger
 
-from opsideployclientagent.common import DeployThread
+from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
 
 class SSHRemoteExecutionException(Exception):
@@ -54,13 +54,17 @@ class PosixDeployThread(DeployThread):
 
 		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")				# clean up previous run
 		logger.notice("Copying installation scripts...")
-		self._copy_over_ssh(os.path.join(local_folder, 'files'), remote_folder)
-		if not os.path.exists(os.path.join(local_folder, 'custom')):
-			os.makedirs(os.path.join(local_folder, 'custom'))
-		self._copy_over_ssh(os.path.join(local_folder, 'custom'), remote_folder)
-		self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(remote_folder, 'setup.opsiscript'))
-		self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(remote_folder, 'oca-installation-helper'))
-		return remote_folder
+		try:
+			self._copy_over_ssh(os.path.join(local_folder, 'files'), remote_folder)
+			if not os.path.exists(os.path.join(local_folder, 'custom')):
+				os.makedirs(os.path.join(local_folder, 'custom'))
+			self._copy_over_ssh(os.path.join(local_folder, 'custom'), remote_folder)
+			self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(remote_folder, 'setup.opsiscript'))
+			self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(remote_folder, 'oca-installation-helper'))
+			return remote_folder
+		except Exception as error:
+			logger.error("Failed to copy installation files: %s", error, exc_info=True)
+			raise FiletransferUnsuccessful from error
 
 	def run_installation(self, remote_folder):
 		if self.target_os == "linux":
