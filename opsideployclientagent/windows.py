@@ -18,7 +18,7 @@ import tempfile
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
 
-from opsideployclientagent.common import DeployThread, execute
+from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
 
 
 def winexe(cmd, host, username, password, timeout=None):
@@ -88,13 +88,17 @@ class WindowsDeployThread(DeployThread):
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
-		if self.mount_with_smbclient:
-			logger.debug("Installing using client-side mount.")
-			return self.copy_data_clientside_mount()
-		logger.debug("Installing using server-side mount.")
-		return self.copy_data_serverside_mount()
+		try:
+			if self.mount_with_smbclient:
+				logger.debug('Installing using smbclient.')
+				return self.copy_data_smbclient()
+			logger.debug('Installing using server-side mount.')
+			return self.copy_data_serverside_mount()
+		except Exception as error:  # pylint: disable=broad-except
+			logger.error("Failed to copy installation files: %s", error, exc_info=True)
+			raise FiletransferUnsuccessful from error
 
-	def copy_data_clientside_mount(self):
+	def copy_data_smbclient(self):
 		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
 		smbclient_cmd = shutil.which('smbclient')
@@ -164,7 +168,8 @@ class WindowsDeployThread(DeployThread):
 		try:
 			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
-			raise Exception(f"Failed to install {self.product_id}: {err}") from err
+			logger.error("Failed to install %s: %s", self.product_id, err)
+			raise
 
 	def finalize(self):
 		cmd = ""
@@ -191,7 +196,7 @@ class WindowsDeployThread(DeployThread):
 				shutil.rmtree(self.mounted_oca_dir)
 			except OSError as err:
 				logger.debug("Removing %s failed: %s", self.mounted_oca_dir, err, exc_info=True)
-		elif remote_folder:  # in case of clientside mount
+		elif remote_folder:  # in case of smbclient
 			try:
 				cmd = f'cmd.exe /C "del /s /q {remote_folder} && rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes

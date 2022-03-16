@@ -10,12 +10,12 @@ that are already running an operating system that has not been
 installed via opsi.
 """
 
-__version__ = '4.2.0.18'
+__version__ = '4.2.0.19'
 
 
 import getpass
 import os
-from typing import List
+from typing import Dict
 import time
 from pathlib import Path
 import paramiko  # type: ignore[import]
@@ -24,19 +24,23 @@ from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
 from opsicommon.logging import logger, secret_filter  # type: ignore[import]
 from opsicommon.types import forceUnicode, forceUnicodeLower  # type: ignore[import]
 
-from opsideployclientagent.common import SKIP_MARKER, execute
+from opsideployclientagent.common import execute
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
 
-def write_failed_clients(clients: List[str], failed_clients_file: Path) -> None:
+def write_failed_clients(clients: Dict[str, str], failed_clients_file: Path) -> None:
+	if failed_clients_file.name == "console":
+		for client, reason in clients.items():
+			print(f"{client}\t{reason}")
+		return
 	if failed_clients_file.exists():
 		logger.info("Deleting file %s", failed_clients_file)
 		failed_clients_file.unlink()
 	logger.notice("Writing list of failed clients to file %s", failed_clients_file)
 	with open(failed_clients_file, "w", encoding="utf-8") as fcfile:
-		for client in clients:
-			fcfile.write(client + "\n")
+		for client, reason in clients.items():
+			fcfile.write(f"{client}\t{reason}\n")
 
 
 def get_password(password: str) -> str:
@@ -136,7 +140,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	total = 0
 	fails = 0
 	skips = 0
-	failed_clients = []
+	failed_clients = {}
 
 	running_threads = []
 	while hosts or running_threads:
@@ -181,11 +185,11 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 			if thread.is_alive():
 				new_running_threads.append(thread)
 			else:
-				if thread.success == SKIP_MARKER:
+				if thread.result == "clientskipped":
 					skips += 1
-				elif not thread.success:
+				elif thread.result != "success":
 					fails += 1
-					failed_clients.append(thread.host)
+					failed_clients.update({thread.host: thread.result})
 		running_threads = new_running_threads
 		time.sleep(1)
 
