@@ -15,8 +15,8 @@ import os
 import logging
 import tempfile
 
-from opsicommon.logging import logger
-from opsicommon.types import forceUnicode
+from opsicommon.logging import logger  # type: ignore[import]
+from opsicommon.types import forceUnicode  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
 
@@ -27,25 +27,21 @@ def winexe(cmd, host, username, password, timeout=None):
 	username = forceUnicode(username)
 	password = forceUnicode(password)
 
-	match = re.search(r'^([^\\\\]+)\\\\+([^\\\\]+)$', username)
+	match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
 	if match:
-		username = match.group(1) + r'\\' + match.group(2)
+		username = match.group(1) + r"\\" + match.group(2)
+
+	executable = shutil.which("winexe")
+	if not executable:
+		logger.critical("Unable to find 'winexe'. Please install 'opsi-windows-support' through your operating systems package manager!")
+		raise RuntimeError("Command 'winexe' not found in PATH")
 
 	try:
-		executable = execute("which winexe")[0]
-	except Exception as err:  # pylint: disable=broad-except
-		logger.critical(
-			"Unable to find 'winexe'. Please install 'opsi-windows-support' "
-			"through your operating systems package manager!"
-		)
-		raise RuntimeError("Missing 'winexe'") from err
-
-	try:
-		logger.info('Winexe Version: %s', execute(f'{executable} -V')[0])
+		logger.info("Winexe Version: %s", execute(f"{executable} -V")[0])
 	except Exception as err:  # pylint: disable=broad-except
 		logger.warning("Failed to get version: %s", err)
 
-	credentials = username + '%' + password.replace("'", "'\"'\"'")
+	credentials = username + "%" + password.replace("'", "'\"'\"'")
 	if logger.isEnabledFor(logging.DEBUG):
 		return execute(f"{executable} -d 9 -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
 	return execute(f"{executable} -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
@@ -53,17 +49,38 @@ def winexe(cmd, host, username, password, timeout=None):
 
 class WindowsDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
-		self, host, backend, username, password, finalize_action="start_service",
-		deployment_method="hostname", stop_on_ping_failure=True,
-		skip_existing_client=False, mount_with_smbclient=True,
-		keep_client_on_failure=False, additional_client_settings=None,
-		depot=None, group=None, install_timeout=None
+		self,
+		host,
+		backend,
+		username,
+		password,
+		finalize_action="start_service",
+		deployment_method="hostname",
+		stop_on_ping_failure=True,
+		skip_existing_client=False,
+		mount_with_smbclient=True,
+		keep_client_on_failure=False,
+		additional_client_settings=None,
+		depot=None,
+		group=None,
+		install_timeout=None,
 	):
 		DeployThread.__init__(
-			self, host, backend, username, password, finalize_action,
-			deployment_method, stop_on_ping_failure,
-			skip_existing_client, mount_with_smbclient, keep_client_on_failure,
-			additional_client_settings, depot, group, install_timeout
+			self,
+			host,
+			backend,
+			username,
+			password,
+			finalize_action,
+			deployment_method,
+			stop_on_ping_failure,
+			skip_existing_client,
+			mount_with_smbclient,
+			keep_client_on_failure,
+			additional_client_settings,
+			depot,
+			group,
+			install_timeout,
 		)
 
 		self.mount_point = None
@@ -73,18 +90,22 @@ class WindowsDeployThread(DeployThread):
 		logger.notice("Copying installation files")
 		try:
 			if self.mount_with_smbclient:
-				logger.debug('Installing using client-side mount.')
-				return self.copy_data_clientside_mount()
+				logger.debug('Installing using smbclient.')
+				return self.copy_data_smbclient()
 			logger.debug('Installing using server-side mount.')
 			return self.copy_data_serverside_mount()
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 
-	def copy_data_clientside_mount(self):
-		credentials = self.username + '%' + self.password.replace("'", "'\"'\"'")
+	def copy_data_smbclient(self):
+		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-		smbclient_cmd = execute("which smbclient")[0]
+		smbclient_cmd = shutil.which('smbclient')
+		if not smbclient_cmd:
+			logger.critical("Unable to find 'smbclient'.")
+			raise RuntimeError("Command 'smbclient' not found in PATH")
+
 		cmd = (
 			f"{smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
 			" -c 'prompt; recurse;"
@@ -98,19 +119,22 @@ class WindowsDeployThread(DeployThread):
 		self.mount_point = tempfile.TemporaryDirectory().name  # pylint: disable=consider-using-with
 
 		logger.notice("Mounting c$ share")
-		mount_cmd = execute("which mount")[0]
+		mount_cmd = shutil.which("mount")
+		if not mount_cmd:
+			logger.critical("Unable to find 'mount'.")
+			raise RuntimeError("Command 'mount' not found in PATH")
 		try:
 			password = self.password.replace("'", "'\"'\"'")
 			try:
 				execute(
 					f"{mount_cmd} -t cifs -o'username={self.username},password={password}' //{self.network_address}/c$ {self.mount_point}",
-					timeout=15
+					timeout=15,
 				)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.info("Failed to mount clients c$ share: %s, retrying with port 139", err)
 				execute(
 					f"{mount_cmd} -t cifs -o'port=139,username={self.username},password={password}' //{self.network_address}/c$ {self.mount_point}",
-					timeout=15
+					timeout=15,
 				)
 		except Exception as err:  # pylint: disable=broad-except
 			raise Exception(
@@ -122,10 +146,10 @@ class WindowsDeployThread(DeployThread):
 		self.mounted_oca_dir = os.path.join(self.mount_point, "opsi.org", "tmp", "opsi-client-agent_inst")
 		os.makedirs(self.mounted_oca_dir, exist_ok=True)
 
-		shutil.copytree('files', self.mounted_oca_dir)
-		shutil.copytree('custom', self.mounted_oca_dir)
-		shutil.copy('setup.opsiscript', self.mounted_oca_dir)
-		shutil.copy('oca-installation-helper.exe', self.mounted_oca_dir)
+		shutil.copytree("files", self.mounted_oca_dir)
+		shutil.copytree("custom", self.mounted_oca_dir)
+		shutil.copy("setup.opsiscript", self.mounted_oca_dir)
+		shutil.copy("oca-installation-helper.exe", self.mounted_oca_dir)
 		return "c:\\opsi.org\\tmp\\opsi-client-agent_inst"
 
 	def run_installation(self, remote_folder):
@@ -140,7 +164,7 @@ class WindowsDeployThread(DeployThread):
 			f" --no-gui --non-interactive"
 		)
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
-		logger.notice('Running installation script...')
+		logger.notice("Running installation script...")
 		try:
 			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
@@ -171,24 +195,24 @@ class WindowsDeployThread(DeployThread):
 			try:
 				shutil.rmtree(self.mounted_oca_dir)
 			except OSError as err:
-				logger.debug('Removing %s failed: %s', self.mounted_oca_dir, err, exc_info=True)
-		elif remote_folder:  # in case of clientside mount
+				logger.debug("Removing %s failed: %s", self.mounted_oca_dir, err, exc_info=True)
+		elif remote_folder:  # in case of smbclient
 			try:
 				cmd = f'cmd.exe /C "del /s /q {remote_folder} && rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
 				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
-				logger.debug('Removing %s failed: %s', remote_folder, err, exc_info=True)
+				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
 		if self.mount_point:
 			try:
 				execute(f"umount {self.mount_point}")
 			except Exception as err:  # pylint: disable=broad-except
-				logger.warning('Unmounting %s failed: %s', self.mount_point, err, exc_info=True)
+				logger.warning("Unmounting %s failed: %s", self.mount_point, err, exc_info=True)
 			try:
 				os.rmdir(self.mount_point)
 			except OSError as err:
-				logger.debug('Removing %s failed: %s', self.mount_point, err, exc_info=True)
+				logger.debug("Removing %s failed: %s", self.mount_point, err, exc_info=True)
 
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
@@ -196,7 +220,7 @@ class WindowsDeployThread(DeployThread):
 			output = winexe('cmd.exe /C "echo %COMPUTERNAME%"', host, self.username, self.password)
 			for line in output:
 				if line.strip():
-					if 'unknown parameter' in line.lower():
+					if "unknown parameter" in line.lower():
 						continue
 
 					host_id = line.strip()
@@ -215,8 +239,8 @@ class WindowsDeployThread(DeployThread):
 			# cleanup is not allowed to take longer than 2 minutes
 			winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 		except Exception as err:  # pylint: disable=broad-except
-			if 'NT_STATUS_LOGON_FAILURE' in str(err):
+			if "NT_STATUS_LOGON_FAILURE" in str(err):
 				logger.warning("Can't connect to %s: check your credentials", self.network_address)
-			elif 'NT_STATUS_IO_TIMEOUT' in str(err):
+			elif "NT_STATUS_IO_TIMEOUT" in str(err):
 				logger.warning("Can't connect to %s: firewall on client seems active", self.network_address)
 			raise Exception(f"Failed to execute command {cmd} on host {self.network_address}: winexe error: {err}") from err

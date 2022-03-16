@@ -10,7 +10,7 @@ that are already running an operating system that has not been
 installed via opsi.
 """
 
-__version__ = '4.2.0.14'
+__version__ = '4.2.0.19'
 
 
 import getpass
@@ -18,11 +18,11 @@ import os
 from typing import Dict
 import time
 from pathlib import Path
-import paramiko
+import paramiko  # type: ignore[import]
 
-from OPSI.Backend.BackendManager import BackendManager
-from opsicommon.logging import logger, secret_filter
-from opsicommon.types import forceUnicode, forceUnicodeLower
+from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
+from opsicommon.logging import logger, secret_filter  # type: ignore[import]
+from opsicommon.types import forceUnicode, forceUnicodeLower  # type: ignore[import]
 
 from opsideployclientagent.common import execute
 from opsideployclientagent.posix import PosixDeployThread

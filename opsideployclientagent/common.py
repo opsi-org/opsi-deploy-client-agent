@@ -9,17 +9,21 @@ common deployment module
 This module contains the class DeployThread and related methods.
 """
 
-import time
-import threading
-import socket
 import re
 import os
 import sys
+import time
+import socket
+import threading
 import subprocess
+from typing import List
 
-from opsicommon.objects import OpsiClient, ProductOnClient
-from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
-from opsicommon.logging import logger, secret_filter, log_context
+from opsicommon.objects import OpsiClient, ProductOnClient  # type: ignore[import]
+from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId  # type: ignore[import]
+from opsicommon.logging import logger, secret_filter, log_context  # type: ignore[import]
+from opsicommon.utils import monkeypatch_subprocess_for_frozen  # type: ignore[import]
+
+monkeypatch_subprocess_for_frozen()
 
 
 def get_product_id():
@@ -48,11 +52,11 @@ def get_product_id():
 	return product_id
 
 
-def execute(cmd, timeout=None):
-	logger.info("executing %s", cmd)
+def execute(cmd: str, timeout: int = None) -> List[str]:
+	logger.info("Executing %s", cmd)
 	if timeout:
-		logger.info("timeout is %s s", timeout)
-	# in case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
+		logger.info("Timeout is %s seconds", timeout)
+	# In case of fail subprocess.CalledProcessError or subprocess.TimeoutExpired
 	return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=timeout).decode("utf-8", errors="replace").split("\n")
 
 

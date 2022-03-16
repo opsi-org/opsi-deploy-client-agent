@@ -24,18 +24,16 @@ that are already running an operating system that has not been
 installed via opsi.
 
 :copyright: uib GmbH <info@uib.de>
-:author: Jan Schneider <j.schneider@uib.de>
-:author: Niko Wenselowski <n.wenselowski@uib.de>
 :license: GNU Affero General Public License version 3
 """
 import sys
 import argparse
 from pathlib import Path
-import paramiko
+import paramiko  # type: ignore[import]
 
-from opsicommon import __version__ as python_opsi_common_version
-from opsicommon.logging import logging_config, logger
-from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG
+from opsicommon import __version__ as python_opsi_common_version  # type: ignore[import]
+from opsicommon.logging import logging_config, logger  # type: ignore[import]
+from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG  # type: ignore[import]
 
 from opsideployclientagent import deploy_client_agent, __version__
 from opsideployclientagent.common import get_product_id
@@ -55,135 +53,152 @@ def get_target_os():
 def parse_args(target_os):
 	script_description = "Deploy opsi client agent to the specified clients."
 	if target_os in ("linux", "macos"):
-		script_description = '\n'.join((
-			script_description,
-			"The clients must be accessible via SSH.",
-			"The user must be allowed to use sudo non-interactive.",
-		))
+		script_description = "\n".join(
+			(
+				script_description,
+				"The clients must be accessible via SSH.",
+				"The user must be allowed to use sudo non-interactive.",
+			)
+		)
 		default_user = "root"
 	else:
-		script_description = '\n'.join((
-			script_description,
-			"The c$ and admin$ must be accessible on every client.",
-			"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
-		))
+		script_description = "\n".join(
+			(
+				script_description,
+				"The c$ and admin$ must be accessible on every client.",
+				"Simple File Sharing (Folder Options) should be disabled on the Windows machine.",
+			)
+		)
 		default_user = "Administrator"
 
 	parser = argparse.ArgumentParser(description=script_description)
-	parser.add_argument('--version', '-V', action='version', version=f"{__version__} [python-opsi-common={python_opsi_common_version}]")
+	parser.add_argument("--version", "-V", action="version", version=f"{__version__} [python-opsi-common={python_opsi_common_version}]")
 	parser.add_argument(
-		'--verbose', '-v', dest="log_level", default=LOG_WARNING, action="count",
-		help="increase verbosity (can be used multiple times)"
+		"--verbose", "-v", dest="log_level", default=LOG_WARNING, action="count", help="increase verbosity (can be used multiple times)"
 	)
+	parser.add_argument("--debug-file", dest="debug_file", help="Write debug output to given file.")
 	parser.add_argument(
-		'--debug-file', dest='debug_file', help='Write debug output to given file.'
+		"--username",
+		"-u",
+		dest="username",
+		default=default_user,
+		help=f"username for authentication (default: {default_user})." + r"Example for a domain account: -u <DOMAIN>\\<username>",
 	)
-	parser.add_argument(
-		'--username', '-u', dest="username", default=default_user,
-		help=f'username for authentication (default: {default_user}).' + r'Example for a domain account: -u <DOMAIN>\\<username>'
-	)
-	parser.add_argument(
-		'--password', '-p', dest="password", default="", help="password for authentication"
-	)
+	parser.add_argument("--password", "-p", dest="password", default="", help="password for authentication")
 	network_access_group = parser.add_mutually_exclusive_group()
 	network_access_group.add_argument(
-		'--use-fqdn', '-c', dest="deployment_method", action="store_const", const="fqdn",
-		help="Use FQDN to connect to client."
+		"--use-fqdn", "-c", dest="deployment_method", action="store_const", const="fqdn", help="Use FQDN to connect to client."
 	)
 	network_access_group.add_argument(
-		'--use-hostname', dest="deployment_method", action="store_const", const="hostname",
-		help="Use hostname to connect to client."
+		"--use-hostname", dest="deployment_method", action="store_const", const="hostname", help="Use hostname to connect to client."
 	)
 	network_access_group.add_argument(
-		'--use-ip-address', dest="deployment_method", action='store_const', const="ip",
-		help="Use IP address to connect to client."
+		"--use-ip-address", dest="deployment_method", action="store_const", const="ip", help="Use IP address to connect to client."
 	)
 	parser.add_argument(
-		'--ignore-failed-ping', '-x', dest="stop_on_ping_failure", default=True, action="store_false",
-		help="try installation even if ping fails"
+		"--ignore-failed-ping",
+		"-x",
+		dest="stop_on_ping_failure",
+		default=True,
+		action="store_false",
+		help="try installation even if ping fails",
 	)
 	if target_os in ("linux", "macos"):
 		ssh_policy_group = parser.add_mutually_exclusive_group()
 		ssh_policy_group.add_argument(
-			'--ssh-hostkey-add', dest="ssh_hostkey_policy", const=paramiko.AutoAddPolicy, action="store_const",
-			help="Automatically add unknown SSH hostkeys."
+			"--ssh-hostkey-add",
+			dest="ssh_hostkey_policy",
+			const=paramiko.AutoAddPolicy,
+			action="store_const",
+			help="Automatically add unknown SSH hostkeys.",
 		)
 		ssh_policy_group.add_argument(
-			'--ssh-hostkey-reject', dest="ssh_hostkey_policy", const=paramiko.RejectPolicy, action="store_const",
-			help="Reject unknown SSH hostkeys."
+			"--ssh-hostkey-reject",
+			dest="ssh_hostkey_policy",
+			const=paramiko.RejectPolicy,
+			action="store_const",
+			help="Reject unknown SSH hostkeys.",
 		)
 		ssh_policy_group.add_argument(
-			'--ssh-hostkey-warn', dest="ssh_hostkey_policy", const=paramiko.WarningPolicy, action="store_const",
-			help="Warn when encountering unknown SSH hostkeys. (Default)"
+			"--ssh-hostkey-warn",
+			dest="ssh_hostkey_policy",
+			const=paramiko.WarningPolicy,
+			action="store_const",
+			help="Warn when encountering unknown SSH hostkeys. (Default)",
 		)
 
 	finalize_action_group = parser.add_mutually_exclusive_group()
 	finalize_action_group.add_argument(
-		'--reboot', '-r', dest="finalize_action", const="reboot", action="store_const",
-		help="reboot computer after installation"
+		"--reboot", "-r", dest="finalize_action", const="reboot", action="store_const", help="reboot computer after installation"
 	)
 	finalize_action_group.add_argument(
-		'--shutdown', '-s', dest="finalize_action", const="shutdown", action="store_const",
-		help="shutdown computer after installation"
+		"--shutdown", "-s", dest="finalize_action", const="shutdown", action="store_const", help="shutdown computer after installation"
 	)
 	finalize_action_group.add_argument(
-		'--start-opsiclientd', '-o', dest="finalize_action", const="start_service", action="store_const",
-		help="Start opsiclientd service after installation without performing Events (default)."
+		"--start-opsiclientd",
+		"-o",
+		dest="finalize_action",
+		const="start_service",
+		action="store_const",
+		help="Start opsiclientd service after installation without performing Events (default).",
 	)
 	finalize_action_group.add_argument(
-		'--no-start-opsiclientd', dest="finalize_action", const="no_start_service", action="store_const",
-		help="Do not start opsiclientd service after installation (deprecated)."
+		"--no-start-opsiclientd",
+		dest="finalize_action",
+		const="no_start_service",
+		action="store_const",
+		help="Do not start opsiclientd service after installation (deprecated).",
 	)
 	parser.add_argument(
-		'--hosts-from-file', '-f', dest="host_file", default=None,
+		"--hosts-from-file",
+		"-f",
+		dest="host_file",
+		default=None,
 		help=(
 			"File containing addresses of hosts (one per line). If there is a space followed by text after the "
 			"address this will be used as client description for new clients."
-		)
+		),
 	)
 	parser.add_argument(
-		'--skip-existing-clients', '-S', dest="skip_existing_client", default=False,
-		action="store_true", help="skip known opsi clients"
+		"--skip-existing-clients", "-S", dest="skip_existing_client", default=False, action="store_true", help="skip known opsi clients"
 	)
-	parser.add_argument(
-		'--threads', '-t', dest="max_threads", default=1, type=int,
-		help="number of concurrent deployment threads"
-	)
-	parser.add_argument(
-		'--install-timeout', default=None, type=float, help="timeout for single threads (default is unlimited)"
-	)
+	parser.add_argument("--threads", "-t", dest="max_threads", default=1, type=int, help="number of concurrent deployment threads")
+	parser.add_argument("--install-timeout", default=None, type=float, help="timeout for single threads (default is unlimited)")
 
-	parser.add_argument('--depot', help="Assign new clients to the given depot.")
-	parser.add_argument('--group', dest="group", help="Assign fresh clients to an already existing group.")
+	parser.add_argument("--depot", help="Assign new clients to the given depot.")
+	parser.add_argument("--group", dest="group", help="Assign fresh clients to an already existing group.")
 
 	if target_os not in ("linux", "macos"):
 		mount_group = parser.add_mutually_exclusive_group()
 		mount_group.add_argument(
-			'--smbclient', dest="mount_with_smbclient", default=True, action="store_true",
-			help="Mount the client's C$-share via smbclient."
+			"--smbclient", dest="mount_with_smbclient", default=True, action="store_true", help="Mount the client's C$-share via smbclient."
 		)
 		mount_group.add_argument(
-			'--mount', dest="mount_with_smbclient", action="store_false",
+			"--mount",
+			dest="mount_with_smbclient",
+			action="store_false",
 			help=(
 				"Mount the client's C$-share via normal mount on the server for copying the files."
 				"This imitates the behaviour of the 'old' script."
-			)
+			),
 		)
 
 	client_removal_group = parser.add_mutually_exclusive_group()
 	client_removal_group.add_argument(
-		'--keep-client-on-failure', dest="keep_client_on_failure", default=True, action="store_true",
-		help=(
-			"If the client was created in opsi through this script it will not "
-			"be removed in case of failure. (DEFAULT)"
-		)
+		"--keep-client-on-failure",
+		dest="keep_client_on_failure",
+		default=True,
+		action="store_true",
+		help=("If the client was created in opsi through this script it will not " "be removed in case of failure. (DEFAULT)"),
 	)
 	client_removal_group.add_argument(
-		'--remove-client-on-failure', dest="keep_client_on_failure", action="store_false",
-		help="If the client was created in opsi through this script it will be removed in case of failure."
+		"--remove-client-on-failure",
+		dest="keep_client_on_failure",
+		action="store_false",
+		help="If the client was created in opsi through this script it will be removed in case of failure.",
 	)
 	parser.add_argument("--failed-clients-file", help="filename to store list of failed clients in")
-	parser.add_argument('host', nargs='*', help='The hosts to deploy the opsi-client-agent to.')
+	parser.add_argument("host", nargs="*", help="The hosts to deploy the opsi-client-agent to.")
 
 	args = parser.parse_args()
 	logging_config(stderr_level=args.log_level, stderr_format=DEFAULT_COLORED_FORMAT, log_file=args.debug_file, file_level=LOG_DEBUG)
@@ -224,7 +239,7 @@ def main():
 		keep_client_on_failure=args.keep_client_on_failure,
 		ssh_hostkey_policy=ssh_hostkey_policy,
 		install_timeout=args.install_timeout,
-		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None
+		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None,
 	)
 	sys.exit(returncode)
 

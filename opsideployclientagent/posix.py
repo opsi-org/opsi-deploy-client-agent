@@ -13,9 +13,9 @@ import sys
 import os
 import re
 from contextlib import closing, contextmanager
-import paramiko
+import paramiko  # type: ignore[import]
 
-from opsicommon.logging import logger
+from opsicommon.logging import logger  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
@@ -26,18 +26,41 @@ class SSHRemoteExecutionException(Exception):
 
 class PosixDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
-		self, host, backend, username, password, target_os, finalize_action="start_service",
-		deployment_method="hostname", stop_on_ping_failure=True,
-		skip_existing_client=False, mount_with_smbclient=True,
-		keep_client_on_failure=False, additional_client_settings=None,
-		depot=None, group=None, ssh_policy=paramiko.WarningPolicy, install_timeout=None
+		self,
+		host,
+		backend,
+		username,
+		password,
+		target_os,
+		finalize_action="start_service",
+		deployment_method="hostname",
+		stop_on_ping_failure=True,
+		skip_existing_client=False,
+		mount_with_smbclient=True,
+		keep_client_on_failure=False,
+		additional_client_settings=None,
+		depot=None,
+		group=None,
+		ssh_policy=paramiko.WarningPolicy,
+		install_timeout=None,
 	):
 
 		DeployThread.__init__(
-			self, host, backend, username, password,
-			finalize_action, deployment_method, stop_on_ping_failure,
-			skip_existing_client, mount_with_smbclient, keep_client_on_failure,
-			additional_client_settings, depot, group, install_timeout
+			self,
+			host,
+			backend,
+			username,
+			password,
+			finalize_action,
+			deployment_method,
+			stop_on_ping_failure,
+			skip_existing_client,
+			mount_with_smbclient,
+			keep_client_on_failure,
+			additional_client_settings,
+			depot,
+			group,
+			install_timeout,
 		)
 
 		self.target_os = target_os
@@ -46,13 +69,13 @@ class PosixDeployThread(DeployThread):
 		self.credentialsfile = None
 
 	def copy_data(self):
-		remote_folder = os.path.join('/tmp', 'opsi-client-agent')
-		if getattr(sys, 'frozen', False):
-			local_folder = os.path.dirname(os.path.abspath(sys.executable))		# for running as executable
+		remote_folder = os.path.join("/tmp", "opsi-client-agent")
+		if getattr(sys, "frozen", False):
+			local_folder = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
 		else:
-			local_folder = os.path.dirname(os.path.abspath(__file__))			# for running from python
+			local_folder = os.path.dirname(os.path.abspath(__file__))  # for running from python
 
-		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")				# clean up previous run
+		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")  # clean up previous run
 		logger.notice("Copying installation scripts...")
 		try:
 			self._copy_over_ssh(os.path.join(local_folder, 'files'), remote_folder)
@@ -81,8 +104,8 @@ class PosixDeployThread(DeployThread):
 			f" --client-id {self.host_object.id}"
 			f" --no-gui --non-interactive"
 		)
-		if self.username != 'root':
-			credentialsfile = os.path.join(remote_folder, '.credentials')
+		if self.username != "root":
+			credentialsfile = os.path.join(remote_folder, ".credentials")
 			logger.notice("Writing credentialsfile %s", credentialsfile)
 			self._execute_via_ssh(f"touch {credentialsfile}")
 			self._execute_via_ssh(f"chmod 600 {credentialsfile}")
@@ -91,8 +114,8 @@ class PosixDeployThread(DeployThread):
 			self.credentialsfile = credentialsfile
 
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
-		logger.notice('Running installation script...')
-		logger.info('Executing %s', install_command)
+		logger.notice("Running installation script...")
+		logger.info("Executing %s", install_command)
 		self._execute_via_ssh(install_command, timeout=self.install_timeout)
 
 	def finalize(self):
@@ -101,10 +124,10 @@ class PosixDeployThread(DeployThread):
 		# TODO: shutdown blocks on macos until it is concluded -> error
 		if self.finalize_action == "reboot":
 			logger.notice("Rebooting machine %s", self.network_address)
-			cmd = r'shutdown -r +1 & disown'
+			cmd = r"shutdown -r +1 & disown"
 		elif self.finalize_action == "shutdown":
 			logger.notice("Shutting down machine %s", self.network_address)
-			cmd = r'shutdown -h +1 & disown'
+			cmd = r"shutdown -h +1 & disown"
 		# start_service is performed as last action of the setup.opsiscript
 		# default case is do nothing
 		if cmd:
@@ -129,12 +152,12 @@ class PosixDeployThread(DeployThread):
 				logger.trace("Closing SSH connection failed: %s", err)
 
 	def ask_host_for_hostname(self, host):
-		if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', host):
+		if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host):
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(self._ssh_policy())
 			ssh.connect(host, "22", self.username, self.password)
 			_, stdout, _ = ssh.exec_command("hostname -f")
-			host_id = stdout.readlines()[0].encode('ascii', 'ignore').strip()
+			host_id = stdout.readlines()[0].encode("ascii", "ignore").strip()
 			logger.info("resolved FQDN: %s (type %s)", host_id, type(host_id))
 		if host_id:
 			return host_id
@@ -168,9 +191,7 @@ class PosixDeployThread(DeployThread):
 		if exit_code:
 			logger.debug("Command output: ")
 			logger.debug(out)
-			raise SSHRemoteExecutionException(
-				f"Executing {command} on remote client failed! Got exit code {exit_code}"
-			)
+			raise SSHRemoteExecutionException(f"Executing {command} on remote client failed! Got exit code {exit_code}")
 		return out
 
 	def _connect_via_ssh(self):
@@ -182,11 +203,7 @@ class PosixDeployThread(DeployThread):
 		self._ssh_connection.set_missing_host_key_policy(self._ssh_policy())
 
 		logger.debug("Connecting via SSH...")
-		self._ssh_connection.connect(
-			hostname=self.network_address,
-			username=self.username,
-			password=self.password
-		)
+		self._ssh_connection.connect(hostname=self.network_address, username=self.username, password=self.password)
 
 	def _copy_over_ssh(self, local_path, remote_path):
 		@contextmanager
@@ -215,7 +232,7 @@ class PosixDeployThread(DeployThread):
 			create_folder_if_missing(remote_path)
 			# The following stunt is necessary to get results in 'dirpath'
 			# that can be easily used for folder creation on the remote.
-			with change_directory(os.path.join(local_path, '..')):
+			with change_directory(os.path.join(local_path, "..")):
 				directory_to_walk = os.path.basename(local_path)
 				for dirpath, _, filenames in os.walk(directory_to_walk):
 					create_folder_if_missing(os.path.join(remote_path, dirpath))
