@@ -153,7 +153,7 @@ class WindowsDeployThread(DeployThread):
 		return "c:\\opsi.org\\tmp\\opsi-client-agent_inst"
 
 	def run_installation(self, remote_folder):
-		logger.info("deploying from path %s", remote_folder)
+		logger.info("Deploying from path %s", remote_folder)
 		self._test_winexe_connection()
 		install_command = (
 			f"{remote_folder}/oca-installation-helper.exe"
@@ -198,7 +198,7 @@ class WindowsDeployThread(DeployThread):
 				logger.debug("Removing %s failed: %s", self.mounted_oca_dir, err, exc_info=True)
 		elif remote_folder:  # in case of smbclient
 			try:
-				cmd = f'cmd.exe /C "del /s /q {remote_folder} && rmdir /s /q {remote_folder}'
+				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
 				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
@@ -234,9 +234,9 @@ class WindowsDeployThread(DeployThread):
 
 	def _test_winexe_connection(self):
 		logger.notice("Testing winexe")
-		cmd = r'cmd.exe /C "del /s /q c:\\tmp\\opsi-client-agent_inst && rmdir /s /q c:\\tmp\\opsi-client-agent_inst || echo not found"'
+		cmd = 'cmd.exe /C "echo winexe connection established"'
 		try:
-			# cleanup is not allowed to take longer than 2 minutes
+			# winexe test is not allowed to take longer than 2 minutes
 			winexe(cmd, self.network_address, self.username, self.password, timeout=120)
 		except Exception as err:  # pylint: disable=broad-except
 			if "NT_STATUS_LOGON_FAILURE" in str(err):
