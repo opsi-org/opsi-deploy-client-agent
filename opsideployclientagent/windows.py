@@ -94,10 +94,10 @@ class WindowsDeployThread(DeployThread):
 		host = host or self.network_address
 		arguments = f"/c {command}"
 		with self.establish_connection(host) as connection:
-			stdout, stderr, rc = connection.run_executable("cmd.exe", arguments=arguments, timeout_seconds=timeout)
+			stdout, stderr, return_code = connection.run_executable("cmd.exe", arguments=arguments, timeout_seconds=timeout)
 			logger.debug("stdout:\n%s", stdout)
 			logger.debug("stderr:\n%s", stderr)
-			return rc
+			return return_code
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
