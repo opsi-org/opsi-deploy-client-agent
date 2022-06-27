@@ -9,42 +9,20 @@ windows deployment module
 This module contains the class WindowsDeployThread and related methods.
 """
 
+from contextlib import contextmanager
 import shutil
 import re
 import os
 import logging
 import tempfile
+from typing import Generator
+import pypsexec.client  # type: ignore[import]
+from pypsexec.exceptions import SCMRException  # type: ignore[import]
 
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
-
-
-def winexe(cmd, host, username, password, timeout=None):
-	cmd = forceUnicode(cmd)
-	host = forceUnicode(host)
-	username = forceUnicode(username)
-	password = forceUnicode(password)
-
-	match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
-	if match:
-		username = match.group(1) + r"\\" + match.group(2)
-
-	executable = shutil.which("winexe")
-	if not executable:
-		logger.critical("Unable to find 'winexe'. Please install 'opsi-windows-support' through your operating systems package manager!")
-		raise RuntimeError("Command 'winexe' not found in PATH")
-
-	try:
-		logger.info("Winexe Version: %s", execute(f"{executable} -V")[0])
-	except Exception as err:  # pylint: disable=broad-except
-		logger.warning("Failed to get version: %s", err)
-
-	credentials = username + "%" + password.replace("'", "'\"'\"'")
-	if logger.isEnabledFor(logging.DEBUG):
-		return execute(f"{executable} -d 9 -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
-	return execute(f"{executable} -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
 
 
 class WindowsDeployThread(DeployThread):
@@ -85,6 +63,41 @@ class WindowsDeployThread(DeployThread):
 
 		self.mount_point = None
 		self.mounted_oca_dir = None
+
+	@contextmanager
+	def establish_connection(self, host) -> Generator[pypsexec.client.Client, None, None]:
+		psexec_connection: pypsexec.client.Client = None
+		try:
+			host = forceUnicode(host)
+			username = forceUnicode(self.username)
+			password = forceUnicode(self.password)
+
+			match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
+			if match:
+				username = match.group(1) + r"\\" + match.group(2)
+			psexec_connection = pypsexec.client.Client(host, username=username, password=password)  # TODO: encrypt=False for win7
+			psexec_connection.connect()
+			psexec_connection.create_service()
+			yield psexec_connection
+		finally:
+			if psexec_connection:
+				psexec_connection.cleanup()
+				try:
+					psexec_connection.remove_service()
+				# see https://github.com/jborean93/pypsexec/issues/16
+				except SCMRException as exc:
+					if exc.return_code != 1072:  # ERROR_SERVICE_MARKED_FOR_DELETE
+						raise
+				psexec_connection.disconnect()
+
+	def psexec(self, command, host=None, timeout=None):
+		host = host or self.network_address
+		arguments = f"/c {command}"
+		with self.establish_connection(host) as connection:
+			stdout, stderr, rc = connection.run_executable("cmd.exe", arguments=arguments, timeout_seconds=timeout)
+			logger.debug("stdout:\n%s", stdout)
+			logger.debug("stderr:\n%s", stderr)
+			return rc
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
@@ -154,7 +167,6 @@ class WindowsDeployThread(DeployThread):
 
 	def run_installation(self, remote_folder):
 		logger.info("Deploying from path %s", remote_folder)
-		self._test_winexe_connection()
 		install_command = (
 			f"{remote_folder}/oca-installation-helper.exe"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
@@ -166,7 +178,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
-			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
+			self.psexec(install_command, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
@@ -184,7 +196,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				# finalization is not allowed to take longer than 2 minutes
-				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
+				self.psexec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
@@ -200,7 +212,7 @@ class WindowsDeployThread(DeployThread):
 			try:
 				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
-				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
+				self.psexec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
@@ -217,7 +229,7 @@ class WindowsDeployThread(DeployThread):
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
 		try:
-			output = winexe('cmd.exe /C "echo %COMPUTERNAME%"', host, self.username, self.password)
+			output = self.psexec('cmd.exe /C "echo %COMPUTERNAME%"', host=host)
 			for line in output:
 				if line.strip():
 					if "unknown parameter" in line.lower():
@@ -226,21 +238,8 @@ class WindowsDeployThread(DeployThread):
 					host_id = line.strip()
 					break
 		except Exception as err:
-			logger.debug("Name lookup via winexe failed: %s", err)
+			logger.debug("Name lookup via psexec failed: %s", err)
 			raise ValueError(f"Can't find name for IP {host}: {err}") from err
 
 		logger.debug("Lookup of IP returned hostname %s", host_id)
 		return host_id
-
-	def _test_winexe_connection(self):
-		logger.notice("Testing winexe")
-		cmd = 'cmd.exe /C "echo winexe connection established"'
-		try:
-			# winexe test is not allowed to take longer than 2 minutes
-			winexe(cmd, self.network_address, self.username, self.password, timeout=120)
-		except Exception as err:  # pylint: disable=broad-except
-			if "NT_STATUS_LOGON_FAILURE" in str(err):
-				logger.warning("Can't connect to %s: check your credentials", self.network_address)
-			elif "NT_STATUS_IO_TIMEOUT" in str(err):
-				logger.warning("Can't connect to %s: firewall on client seems active", self.network_address)
-			raise Exception(f"Failed to execute command {cmd} on host {self.network_address}: winexe error: {err}") from err

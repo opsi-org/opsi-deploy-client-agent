@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "opsi-deploy-client-agent"
-version = "4.2.0.21"
+version = "4.2.0.22"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 homepage = "https://www.opsi.org"
 license = "AGPL-3.0"
@@ -15,14 +15,14 @@ name = "uib"
 url = "https://pypi.uib.gmbh/simple/"
 
 [tool.poetry.dependencies]
-python = ">=3.7,<3.11"
+python = ">=3.10,<3.11"
 python-opsi = "^4.2.0.274"
 python-opsi-common = "^4.2.0.275"
 paramiko = "^2.9"
+pypsexec = "^0.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"
-opsi-dev-tools = "^1.1"
 pyinstaller = "^4.9"
 pylint = "^2.12"
 tan = "^22.2"

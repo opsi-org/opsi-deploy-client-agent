@@ -10,7 +10,7 @@ that are already running an operating system that has not been
 installed via opsi.
 """
 
-__version__ = '4.2.0.19'
+__version__ = '4.2.0.22'
 
 
 import getpass
