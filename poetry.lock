@@ -2154,8 +2154,8 @@ pytest = [
     {file = "pytest-7.1.2.tar.gz", hash = "sha256:a06a0425453864a270bc45e71f783330a7428defb4230fb5e6a731fde06ecd45"},
 ]
 python-opsi = [
-    {file = "python-opsi-4.2.0.298.tar.gz", hash = "sha256:5dba628246e60865100d574224983bad842005e49f97d2b182b5d4dab454e469"},
-    {file = "python_opsi-4.2.0.298-py3-none-any.whl", hash = "sha256:97d5fb01c7efc34f3b992553c10553adff0492703db7a4499339ebba5f953f88"},
+    {file = "python-opsi-4.2.0.298.tar.gz", hash = "sha256:5367d0d377c008180a74859eca182cf1b6eabac3399367ab1b8698a0e97546c9"},
+    {file = "python_opsi-4.2.0.298-py3-none-any.whl", hash = "sha256:aa8993217a02e6fee0b83ce2bf8e786fb8227b42dc3c4ccef046aa578048b38a"},
 ]
 python-opsi-common = [
     {file = "python-opsi-common-4.2.0.287.tar.gz", hash = "sha256:a11c60b66b8efa1bc4c05b6365b8c4db0d49bdec64d6da4c0dec9fbc8b42c3aa"},

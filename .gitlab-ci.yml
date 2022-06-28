@@ -12,6 +12,7 @@ stages:
 test:pytest-pylint:
   stage: test
   script:
+    - poetry lock --no-update
     - poetry install
     - poetry run pylint --disable=R,fixme opsideployclientagent
     - poetry run flake8 opsideployclientagent
@@ -20,6 +21,7 @@ build:linux-pyinstaller:
   stage: build
   script:
     - *get-opsi-server
+    - poetry lock --no-update
     - poetry install
     - poetry run opsi-dev-tool --pyinstaller-poetry-build -l info
     - ./dist/opsi-deploy-client-agent --version
