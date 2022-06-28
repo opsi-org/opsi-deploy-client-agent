@@ -10,19 +10,53 @@ This module contains the class WindowsDeployThread and related methods.
 """
 
 from contextlib import contextmanager
+import time
 import shutil
 import re
 import os
 import logging
 import tempfile
-from typing import Generator
-import pypsexec.client  # type: ignore[import]
-from pypsexec.exceptions import SCMRException  # type: ignore[import]
-
+from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
+from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
+from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
+
+PROCESS_CHECK_INTERVAL = 5  # seconds
+PROCESS_MAX_TIMEOUT = 3600
+
+
+def get_process(i_wbem_services, handle):
+	try:
+		i_enum_wbem_class_object = i_wbem_services.ExecQuery(f"SELECT * from Win32_Process where handle = {handle}")
+		process_object = i_enum_wbem_class_object.Next(0xffffffff, 1)[0]
+		# logger.debug(process_object.Name, process_object.Status, process_object.TerminationDate)
+		return process_object
+	except wmi.DCERPCSessionError:
+		logger.debug("Process not found.")
+		return None
+
+
+@contextmanager
+def dcom_connection(host, username, password):
+	dcom = None
+	try:
+		logger.info("Establishing connection with dcom of host '%s'.", host)
+		dcom = DCOMConnection(host, username=username, password=password, oxidResolver=True)
+
+		i_wbem_level_1_login = wmi.IWbemLevel1Login(
+			dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login)
+		)
+		i_wbem_services = i_wbem_level_1_login.NTLMLogin('//./root/cimv2', NULL, NULL)
+		i_wbem_level_1_login.RemRelease()
+		yield i_wbem_services
+	except Exception as error:  # pylint: disable=broad-except
+		logger.error("wmiexec failed: %s", error, exc_info=True)
+	finally:
+		if dcom:
+			dcom.disconnect()
 
 
 class WindowsDeployThread(DeployThread):
@@ -64,40 +98,39 @@ class WindowsDeployThread(DeployThread):
 		self.mount_point = None
 		self.mounted_oca_dir = None
 
-	@contextmanager
-	def establish_connection(self, host) -> Generator[pypsexec.client.Client, None, None]:
-		psexec_connection: pypsexec.client.Client = None
-		try:
-			host = forceUnicode(host)
-			username = forceUnicode(self.username)
-			password = forceUnicode(self.password)
+	def wmiexec(self, cmd, host=None, timeout=None):
+		cmd = forceUnicode(cmd)
+		timeout = timeout or PROCESS_MAX_TIMEOUT
+		host = forceUnicode(host or self.network_address)
+		username = forceUnicode(self.username)
+		password = forceUnicode(self.password)
 
-			match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
-			if match:
-				username = match.group(1) + r"\\" + match.group(2)
-			psexec_connection = pypsexec.client.Client(host, username=username, password=password)  # TODO: encrypt=False for win7
-			psexec_connection.connect()
-			psexec_connection.create_service()
-			yield psexec_connection
-		finally:
-			if psexec_connection:
-				psexec_connection.cleanup()
-				try:
-					psexec_connection.remove_service()
-				# see https://github.com/jborean93/pypsexec/issues/16
-				except SCMRException as exc:
-					if exc.return_code != 1072:  # ERROR_SERVICE_MARKED_FOR_DELETE
-						raise
-				psexec_connection.disconnect()
+		match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
+		if match:
+			username = match.group(1) + r"\\" + match.group(2)
 
-	def psexec(self, command, host=None, timeout=None):
-		host = host or self.network_address
-		arguments = f"/c {command}"
-		with self.establish_connection(host) as connection:
-			stdout, stderr, return_code = connection.run_executable("cmd.exe", arguments=arguments, timeout_seconds=timeout)
-			logger.debug("stdout:\n%s", stdout)
-			logger.debug("stderr:\n%s", stderr)
-			return return_code
+		with dcom_connection(host, username, password) as i_wbem_services:
+			logger.debug("Getting win32_process object.")
+			win32_process, _ = i_wbem_services.GetObject('Win32_Process')
+			outputfile = "c:\\test.txt"
+			logger.notice("Executing '%s' on host '%s'", cmd, host)
+			logger.info("Timeout is %s seconds", timeout)
+			prop = win32_process.Create(f'cmd.exe /Q /c {cmd} > {outputfile}', "c:\\", None).getProperties()
+
+			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+			start_time = time.time()
+			while time.time() - start_time < timeout:
+				if not process_object:
+					logger.debug("Finished process execution.")
+					break
+				logger.debug("Waiting for completion, time is %.2f s", time.time() - start_time)
+				time.sleep(PROCESS_CHECK_INTERVAL)
+				process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+			else:
+				logger.error("Process reached timeout, killing process.")
+				process_object.Terminate(1)
+
+		return ""  # TODO: collect outputfile and return content
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
@@ -178,7 +211,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
-			self.psexec(install_command, timeout=self.install_timeout)
+			self.wmiexec(install_command, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
@@ -196,7 +229,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				# finalization is not allowed to take longer than 2 minutes
-				self.psexec(cmd, timeout=120)
+				self.wmiexec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
@@ -212,7 +245,7 @@ class WindowsDeployThread(DeployThread):
 			try:
 				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
-				self.psexec(cmd, timeout=120)
+				self.wmiexec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
@@ -229,7 +262,7 @@ class WindowsDeployThread(DeployThread):
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
 		try:
-			output = self.psexec('cmd.exe /C "echo %COMPUTERNAME%"', host=host)
+			output = self.wmiexec("echo %COMPUTERNAME%", host=host)
 			for line in output:
 				if line.strip():
 					if "unknown parameter" in line.lower():
