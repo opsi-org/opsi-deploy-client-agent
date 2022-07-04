@@ -53,7 +53,7 @@ def dcom_connection(host, username, password):
 		i_wbem_level_1_login.RemRelease()
 		yield i_wbem_services
 	except Exception as error:  # pylint: disable=broad-except
-		logger.error("wmiexec failed: %s", error, exc_info=True)
+		logger.error("Could not open DCOM connection: %s", error, exc_info=True)
 	finally:
 		if dcom:
 			dcom.disconnect()
@@ -98,9 +98,7 @@ class WindowsDeployThread(DeployThread):
 		self.mount_point = None
 		self.mounted_oca_dir = None
 
-	def wmiexec(self, cmd, host=None, timeout=None):
-		cmd = forceUnicode(cmd)
-		timeout = timeout or PROCESS_MAX_TIMEOUT
+	def get_connection_data(self, host):
 		host = forceUnicode(host or self.network_address)
 		username = forceUnicode(self.username)
 		password = forceUnicode(self.password)
@@ -108,14 +106,19 @@ class WindowsDeployThread(DeployThread):
 		match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
 		if match:
 			username = match.group(1) + r"\\" + match.group(2)
+		return host, username, password
+
+	def wmi_exec(self, cmd, host=None, timeout=None):
+		cmd = forceUnicode(cmd)
+		timeout = timeout or PROCESS_MAX_TIMEOUT
+		host, username, password = self.get_connection_data(host)
 
 		with dcom_connection(host, username, password) as i_wbem_services:
 			logger.debug("Getting win32_process object.")
 			win32_process, _ = i_wbem_services.GetObject('Win32_Process')
-			outputfile = "c:\\test.txt"
 			logger.notice("Executing '%s' on host '%s'", cmd, host)
 			logger.info("Timeout is %s seconds", timeout)
-			prop = win32_process.Create(f'cmd.exe /Q /c {cmd} > {outputfile}', "c:\\", None).getProperties()
+			prop = win32_process.Create(f'cmd.exe /Q /c {cmd}', "c:\\", None).getProperties()
 
 			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
 			start_time = time.time()
@@ -130,7 +133,12 @@ class WindowsDeployThread(DeployThread):
 				logger.error("Process reached timeout, killing process.")
 				process_object.Terminate(1)
 
-		return ""  # TODO: collect outputfile and return content
+	def wmi_query(self, query, host=None):
+		host, username, password = self.get_connection_data(host)
+		with dcom_connection(host, username, password) as i_wbem_services:
+			query_result = i_wbem_services.ExecQuery(query)
+			logger.notice("Querying '%s' on host '%s'", query, host)
+			return query_result.Next(0xffffffff, 1)[0]
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
@@ -211,7 +219,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
-			self.wmiexec(install_command, timeout=self.install_timeout)
+			self.wmi_exec(install_command, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
@@ -229,7 +237,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				# finalization is not allowed to take longer than 2 minutes
-				self.wmiexec(cmd, timeout=120)
+				self.wmi_exec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
@@ -245,7 +253,7 @@ class WindowsDeployThread(DeployThread):
 			try:
 				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
-				self.wmiexec(cmd, timeout=120)
+				self.wmi_exec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
@@ -262,17 +270,11 @@ class WindowsDeployThread(DeployThread):
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
 		try:
-			output = self.wmiexec("echo %COMPUTERNAME%", host=host)
-			for line in output:
-				if line.strip():
-					if "unknown parameter" in line.lower():
-						continue
-
-					host_id = line.strip()
-					break
-		except Exception as err:
-			logger.debug("Name lookup via psexec failed: %s", err)
+			result = self.wmi_query("SELECT * from Win32_ComputerSystem", host=host)
+			if not result or not hasattr(result, "Name"):
+				raise ValueError("Did not get Computer Name")
+			logger.debug("Lookup of IP returned hostname %s", result.Name)
+			return result.Name
+		except Exception as err:  # pylint: disable=broad-except
+			logger.warning("Name lookup via wmi query failed: %s", err)
 			raise ValueError(f"Can't find name for IP {host}: {err}") from err
-
-		logger.debug("Lookup of IP returned hostname %s", host_id)
-		return host_id

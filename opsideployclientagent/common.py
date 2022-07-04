@@ -163,7 +163,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	def set_host_id(self, host):
 		host_ip = None
 		try:
-			if self.deployment_method == 'ip':
+			raise socket.herror()  # TODO: remove
+			if self.deployment_method == 'ip':  # pylint: disable=unreachable
 				host_ip = forceIPAddress(host)
 				(hostname, _, _) = socket.gethostbyaddr(host_ip)
 				host = hostname
