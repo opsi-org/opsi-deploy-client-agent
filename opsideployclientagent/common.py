@@ -171,10 +171,10 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 			self.host = _get_id_from_hostname(host, host_ip)
 		except socket.herror as error:
-			logger.warning("Resolving hostName failed, attempting to resolve fqdn via connection to ip %s", host_ip)
-			logger.debug("Lookup for %s failed: %s", host_ip, error)
+			logger.warning("Resolving hostName failed, attempting to resolve fqdn via connection to ip %s", host_ip or host)
+			logger.debug("Lookup for %s failed: %s", host_ip or host, error)
 			logger.info("Without a working reverse DNS you can use the file '/etc/hosts' for working around this.")
-			self.host = _get_id_from_hostname(self.ask_host_for_hostname(host_ip if host_ip else host), host_ip)
+			self.host = _get_id_from_hostname(self.ask_host_for_hostname(host_ip or host), host_ip)
 		if not self.host:
 			raise ValueError(f"invalid host {host}")
 

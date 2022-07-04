@@ -9,42 +9,54 @@ windows deployment module
 This module contains the class WindowsDeployThread and related methods.
 """
 
+from contextlib import contextmanager
+import time
 import shutil
 import re
 import os
 import logging
 import tempfile
-
+from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
+from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
+from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
 
+PROCESS_CHECK_INTERVAL = 5  # seconds
+PROCESS_MAX_TIMEOUT = 3600
 
-def winexe(cmd, host, username, password, timeout=None):
-	cmd = forceUnicode(cmd)
-	host = forceUnicode(host)
-	username = forceUnicode(username)
-	password = forceUnicode(password)
 
-	match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
-	if match:
-		username = match.group(1) + r"\\" + match.group(2)
-
-	executable = shutil.which("winexe")
-	if not executable:
-		logger.critical("Unable to find 'winexe'. Please install 'opsi-windows-support' through your operating systems package manager!")
-		raise RuntimeError("Command 'winexe' not found in PATH")
-
+def get_process(i_wbem_services, handle):
 	try:
-		logger.info("Winexe Version: %s", execute(f"{executable} -V")[0])
-	except Exception as err:  # pylint: disable=broad-except
-		logger.warning("Failed to get version: %s", err)
+		i_enum_wbem_class_object = i_wbem_services.ExecQuery(f"SELECT * from Win32_Process where handle = {handle}")
+		process_object = i_enum_wbem_class_object.Next(0xffffffff, 1)[0]
+		# logger.debug(process_object.Name, process_object.Status, process_object.TerminationDate)
+		return process_object
+	except wmi.DCERPCSessionError:
+		logger.debug("Process not found.")
+		return None
 
-	credentials = username + "%" + password.replace("'", "'\"'\"'")
-	if logger.isEnabledFor(logging.DEBUG):
-		return execute(f"{executable} -d 9 -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
-	return execute(f"{executable} -U '{credentials}' //{host} '{cmd}'", timeout=timeout)
+
+@contextmanager
+def dcom_connection(host, username, password):
+	dcom = None
+	try:
+		logger.info("Establishing connection with dcom of host '%s'.", host)
+		dcom = DCOMConnection(host, username=username, password=password, oxidResolver=True)
+
+		i_wbem_level_1_login = wmi.IWbemLevel1Login(
+			dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login)
+		)
+		i_wbem_services = i_wbem_level_1_login.NTLMLogin('//./root/cimv2', NULL, NULL)
+		i_wbem_level_1_login.RemRelease()
+		yield i_wbem_services
+	except Exception as error:  # pylint: disable=broad-except
+		logger.error("Could not open DCOM connection: %s", error, exc_info=True)
+	finally:
+		if dcom:
+			dcom.disconnect()
 
 
 class WindowsDeployThread(DeployThread):
@@ -85,6 +97,48 @@ class WindowsDeployThread(DeployThread):
 
 		self.mount_point = None
 		self.mounted_oca_dir = None
+
+	def get_connection_data(self, host):
+		host = forceUnicode(host or self.network_address)
+		username = forceUnicode(self.username)
+		password = forceUnicode(self.password)
+
+		match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
+		if match:
+			username = match.group(1) + r"\\" + match.group(2)
+		return host, username, password
+
+	def wmi_exec(self, cmd, host=None, timeout=None):
+		cmd = forceUnicode(cmd)
+		timeout = timeout or PROCESS_MAX_TIMEOUT
+		host, username, password = self.get_connection_data(host)
+
+		with dcom_connection(host, username, password) as i_wbem_services:
+			logger.debug("Getting win32_process object.")
+			win32_process, _ = i_wbem_services.GetObject('Win32_Process')
+			logger.notice("Executing '%s' on host '%s'", cmd, host)
+			logger.info("Timeout is %s seconds", timeout)
+			prop = win32_process.Create(f'cmd.exe /Q /c {cmd}', "c:\\", None).getProperties()
+
+			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+			start_time = time.time()
+			while time.time() - start_time < timeout:
+				if not process_object:
+					logger.debug("Finished process execution.")
+					break
+				logger.debug("Waiting for completion, time is %.2f s", time.time() - start_time)
+				time.sleep(PROCESS_CHECK_INTERVAL)
+				process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+			else:
+				logger.error("Process reached timeout, killing process.")
+				process_object.Terminate(1)
+
+	def wmi_query(self, query, host=None):
+		host, username, password = self.get_connection_data(host)
+		with dcom_connection(host, username, password) as i_wbem_services:
+			query_result = i_wbem_services.ExecQuery(query)
+			logger.notice("Querying '%s' on host '%s'", query, host)
+			return query_result.Next(0xffffffff, 1)[0]
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
@@ -154,7 +208,6 @@ class WindowsDeployThread(DeployThread):
 
 	def run_installation(self, remote_folder):
 		logger.info("Deploying from path %s", remote_folder)
-		self._test_winexe_connection()
 		install_command = (
 			f"{remote_folder}/oca-installation-helper.exe"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
@@ -166,7 +219,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
-			winexe(install_command, self.network_address, self.username, self.password, timeout=self.install_timeout)
+			self.wmi_exec(install_command, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
@@ -184,7 +237,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				# finalization is not allowed to take longer than 2 minutes
-				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
+				self.wmi_exec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
@@ -200,7 +253,7 @@ class WindowsDeployThread(DeployThread):
 			try:
 				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
 				# cleanup is not allowed to take longer than 2 minutes
-				winexe(cmd, self.network_address, self.username, self.password, timeout=120)
+				self.wmi_exec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
@@ -217,30 +270,11 @@ class WindowsDeployThread(DeployThread):
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
 		try:
-			output = winexe('cmd.exe /C "echo %COMPUTERNAME%"', host, self.username, self.password)
-			for line in output:
-				if line.strip():
-					if "unknown parameter" in line.lower():
-						continue
-
-					host_id = line.strip()
-					break
-		except Exception as err:
-			logger.debug("Name lookup via winexe failed: %s", err)
-			raise ValueError(f"Can't find name for IP {host}: {err}") from err
-
-		logger.debug("Lookup of IP returned hostname %s", host_id)
-		return host_id
-
-	def _test_winexe_connection(self):
-		logger.notice("Testing winexe")
-		cmd = 'cmd.exe /C "echo winexe connection established"'
-		try:
-			# winexe test is not allowed to take longer than 2 minutes
-			winexe(cmd, self.network_address, self.username, self.password, timeout=120)
+			result = self.wmi_query("SELECT * from Win32_ComputerSystem", host=host)
+			if not result or not hasattr(result, "Name"):
+				raise ValueError("Did not get Computer Name")
+			logger.debug("Lookup of IP returned hostname %s", result.Name)
+			return result.Name
 		except Exception as err:  # pylint: disable=broad-except
-			if "NT_STATUS_LOGON_FAILURE" in str(err):
-				logger.warning("Can't connect to %s: check your credentials", self.network_address)
-			elif "NT_STATUS_IO_TIMEOUT" in str(err):
-				logger.warning("Can't connect to %s: firewall on client seems active", self.network_address)
-			raise Exception(f"Failed to execute command {cmd} on host {self.network_address}: winexe error: {err}") from err
+			logger.warning("Name lookup via wmi query failed: %s", err)
+			raise ValueError(f"Can't find name for IP {host}: {err}") from err
