@@ -208,8 +208,8 @@ class WindowsDeployThread(DeployThread):
 			</Settings>
 			<Actions Context="LocalSystem">
 				<Exec>
-				<Command>powershell.exe</Command>
-				<Arguments>-ExecutionPolicy Bypass -Command {cmd}</Arguments>
+				<Command>cmd.exe</Command>
+				<Arguments>/Q /c {cmd}</Arguments>
 				</Exec>
 			</Actions>
 		</Task>
@@ -230,7 +230,7 @@ class WindowsDeployThread(DeployThread):
 		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
 		try:
 			resp = tsch.hSchRpcRun(dce, f'\\{task_name}')
-			logger.debug(resp.dump())
+			#resp.dump()
 			guid = resp['pGuid']
 			logger.info("Scheduled task started")
 
@@ -238,7 +238,6 @@ class WindowsDeployThread(DeployThread):
 			while time.time() - start_time < timeout:
 				try:
 					resp = tsch.hSchRpcGetInstanceInfo(dce, guid)
-					logger.debug(resp.dump())
 					time.sleep(3)
 				except tsch.DCERPCSessionError as err:
 					# SCHED_E_TASK_NOT_RUNNING
