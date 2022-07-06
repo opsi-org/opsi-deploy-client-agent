@@ -146,6 +146,8 @@ class WindowsDeployThread(DeployThread):
 
 		def copy_dir(src_dir, dst_dir):
 			"""Copy src_dir into dst_dir"""
+			dst_dir = ntpath.join(dst_dir, os.path.basename(src_dir))
+			smbshutil.makedirs(dst_dir)
 			for root, dirs, files in os.walk(src_dir):
 				path = os.path.relpath(root, src_dir)
 				nt_path = path.replace(os.sep, ntpath.sep)
