@@ -12,6 +12,8 @@ This module contains the class WindowsDeployThread and related methods.
 from contextlib import contextmanager
 import time
 import re
+import os
+import ntpath
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
@@ -137,16 +139,29 @@ class WindowsDeployThread(DeployThread):
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
+
+		def copy_dir(src_dir, dst_dir):
+			"""Copy src_dir into dst_dir"""
+			for root, dirs, files in os.walk(src_dir):
+				path = os.path.relpath(root, src_dir)
+				nt_path = path.replace(os.sep, ntpath.sep)
+				for dirname in dirs:
+					dst = ntpath.join(dst_dir, nt_path, dirname)
+					smbshutil.makedirs(dst)
+				for filename in files:
+					src = os.path.join(root, filename)
+					dst = ntpath.join(dst_dir, nt_path, filename)
+					smbshutil.copy2(src, dst)
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
 			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-client-agent_inst"
 			if smbshutil.isdir(remote_folder):
 				smbshutil.rmtree(remote_folder)
 			smbshutil.makedirs(remote_folder)
-			smbshutil.copytree("files", remote_folder)
-			smbshutil.copytree("custom", remote_folder)
-			smbshutil.copy("setup.opsiscript", remote_folder)
-			smbshutil.copy("oca-installation-helper.exe", remote_folder)
+			copy_dir("files", remote_folder)
+			copy_dir("custom", remote_folder)
+			smbshutil.copy2("setup.opsiscript", remote_folder)
+			smbshutil.copy2("oca-installation-helper.exe", remote_folder)
 			return remote_folder
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
