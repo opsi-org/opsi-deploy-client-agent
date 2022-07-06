@@ -208,8 +208,8 @@ class WindowsDeployThread(DeployThread):
 			</Settings>
 			<Actions Context="LocalSystem">
 				<Exec>
-				<Command>powershell.exe</Command>
-				<Arguments>-ExecutionPolicy Bypass -Command {cmd}</Arguments>
+				<Command>cmd.exe</Command>
+				<Arguments>/Q /c {cmd}</Arguments>
 				</Exec>
 			</Actions>
 		</Task>
