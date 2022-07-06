@@ -108,7 +108,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self, host, backend, username, password, finalize_action="start_service",
 		deployment_method="auto", stop_on_ping_failure=True,
-		skip_existing_client=False, mount_with_smbclient=True,
+		skip_existing_client=False,
 		keep_client_on_failure=False, additional_client_settings=None,
 		depot=None, group=None, install_timeout=None
 	):
@@ -122,7 +122,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.finalize_action = finalize_action
 		self.stop_on_ping_failure = stop_on_ping_failure
 		self.skip_existing_client = skip_existing_client
-		self.mount_with_smbclient = mount_with_smbclient
 		self.product_id = get_product_id()
 
 		deployment_method = forceUnicodeLower(deployment_method)

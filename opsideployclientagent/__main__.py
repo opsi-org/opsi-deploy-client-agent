@@ -168,21 +168,6 @@ def parse_args(target_os):
 	parser.add_argument("--depot", help="Assign new clients to the given depot.")
 	parser.add_argument("--group", dest="group", help="Assign fresh clients to an already existing group.")
 
-	if target_os not in ("linux", "macos"):
-		mount_group = parser.add_mutually_exclusive_group()
-		mount_group.add_argument(
-			"--smbclient", dest="mount_with_smbclient", default=True, action="store_true", help="Mount the client's C$-share via smbclient."
-		)
-		mount_group.add_argument(
-			"--mount",
-			dest="mount_with_smbclient",
-			action="store_false",
-			help=(
-				"Mount the client's C$-share via normal mount on the server for copying the files."
-				"This imitates the behaviour of the 'old' script."
-			),
-		)
-
 	client_removal_group = parser.add_mutually_exclusive_group()
 	client_removal_group.add_argument(
 		"--keep-client-on-failure",
@@ -212,9 +197,7 @@ def main():
 	ssh_hostkey_policy = paramiko.WarningPolicy
 	if hasattr(args, "ssh_hostkey_policy") and args.ssh_hostkey_policy is not None:
 		ssh_hostkey_policy = args.ssh_hostkey_policy
-	mount_with_smbclient = True
-	if hasattr(args, "mount_with_smbclient") and args.mount_with_smbclient is not None:
-		mount_with_smbclient = args.mount_with_smbclient
+
 	finalize_action = "start_service"
 	if hasattr(args, "finalize_action") and args.finalize_action is not None:
 		finalize_action = args.finalize_action
@@ -229,7 +212,6 @@ def main():
 		password=args.password,
 		max_threads=args.max_threads,
 		deployment_method=args.deployment_method,
-		mount_with_smbclient=mount_with_smbclient,
 		depot=args.depot,
 		group=args.group,
 		username=args.username,

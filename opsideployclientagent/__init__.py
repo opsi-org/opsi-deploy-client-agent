@@ -63,7 +63,7 @@ def get_password(password: str) -> str:
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
 	hosts, target_os, host_file=None, password=None, max_threads=1,
-	deployment_method="auto", mount_with_smbclient=True, depot=None, group=None,
+	deployment_method="auto", depot=None, group=None,
 	finalize_action="start_service", username=None,
 	stop_on_ping_failure=False, skip_existing_client=False,
 	keep_client_on_failure=True, ssh_hostkey_policy=None,
@@ -103,18 +103,8 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")
 		DeploymentClass = WindowsDeployThread
-
-		if mount_with_smbclient:
-			logger.debug('Explicit check for smbclient.')
-			try:
-				execute("which smbclient")
-			except Exception as err:  # pylint: disable=broad-except
-				raise RuntimeError(f"Please make sure that 'smbclient' is installed: {err}") from err
-		elif os.getuid() != 0:
-			raise RuntimeError("You have to be root to use mount.")
 	else:
 		DeploymentClass = PosixDeployThread
-		mount_with_smbclient = False
 
 	if target_os == "linux":
 		logger.info("Deploying to Linux.")
@@ -157,7 +147,6 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 				"deployment_method": deployment_method,
 				"stop_on_ping_failure": stop_on_ping_failure,
 				"skip_existing_client": skip_existing_client,
-				"mount_with_smbclient": mount_with_smbclient,
 				"keep_client_on_failure": keep_client_on_failure,
 				"depot": depot,
 				"group": group,

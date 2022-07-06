@@ -11,18 +11,15 @@ This module contains the class WindowsDeployThread and related methods.
 
 from contextlib import contextmanager
 import time
-import shutil
 import re
-import os
-import logging
-import tempfile
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
+from smbclient import shutil as smbshutil, register_session  # type: ignore[import]
 
-from opsideployclientagent.common import DeployThread, execute, FiletransferUnsuccessful
+from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
 PROCESS_CHECK_INTERVAL = 5  # seconds
 PROCESS_MAX_TIMEOUT = 3600
@@ -70,7 +67,6 @@ class WindowsDeployThread(DeployThread):
 		deployment_method="hostname",
 		stop_on_ping_failure=True,
 		skip_existing_client=False,
-		mount_with_smbclient=True,
 		keep_client_on_failure=False,
 		additional_client_settings=None,
 		depot=None,
@@ -87,7 +83,6 @@ class WindowsDeployThread(DeployThread):
 			deployment_method,
 			stop_on_ping_failure,
 			skip_existing_client,
-			mount_with_smbclient,
 			keep_client_on_failure,
 			additional_client_settings,
 			depot,
@@ -143,68 +138,19 @@ class WindowsDeployThread(DeployThread):
 	def copy_data(self):
 		logger.notice("Copying installation files")
 		try:
-			if self.mount_with_smbclient:
-				logger.debug('Installing using smbclient.')
-				return self.copy_data_smbclient()
-			logger.debug('Installing using server-side mount.')
-			return self.copy_data_serverside_mount()
+			register_session(server=self.network_address, username=self.username, password=self.password)
+			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-client-agent_inst"
+			if smbshutil.isdir(remote_folder):
+				smbshutil.rmtree(remote_folder)
+			smbshutil.makedirs(remote_folder)
+			smbshutil.copytree("files", remote_folder)
+			smbshutil.copytree("custom", remote_folder)
+			smbshutil.copy("setup.opsiscript", remote_folder)
+			smbshutil.copy("oca-installation-helper.exe", remote_folder)
+			return remote_folder
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
-
-	def copy_data_smbclient(self):
-		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
-		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-		smbclient_cmd = shutil.which('smbclient')
-		if not smbclient_cmd:
-			logger.critical("Unable to find 'smbclient'.")
-			raise RuntimeError("Command 'smbclient' not found in PATH")
-
-		cmd = (
-			f"{smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
-			" -c 'prompt; recurse;"
-			" md opsi.org; cd opsi.org; md log; md tmp; cd tmp; deltree opsi-client-agent_inst; md opsi-client-agent_inst;"
-			" cd opsi-client-agent_inst; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
-		)
-		execute(cmd)
-		return "c:\\opsi.org\\tmp\\opsi-client-agent_inst"
-
-	def copy_data_serverside_mount(self):
-		self.mount_point = tempfile.TemporaryDirectory().name  # pylint: disable=consider-using-with
-
-		logger.notice("Mounting c$ share")
-		mount_cmd = shutil.which("mount")
-		if not mount_cmd:
-			logger.critical("Unable to find 'mount'.")
-			raise RuntimeError("Command 'mount' not found in PATH")
-		try:
-			password = self.password.replace("'", "'\"'\"'")
-			try:
-				execute(
-					f"{mount_cmd} -t cifs -o'username={self.username},password={password}' //{self.network_address}/c$ {self.mount_point}",
-					timeout=15,
-				)
-			except Exception as err:  # pylint: disable=broad-except
-				logger.info("Failed to mount clients c$ share: %s, retrying with port 139", err)
-				execute(
-					f"{mount_cmd} -t cifs -o'port=139,username={self.username},password={password}' //{self.network_address}/c$ {self.mount_point}",
-					timeout=15,
-				)
-		except Exception as err:  # pylint: disable=broad-except
-			raise Exception(
-				f"Failed to mount c$ share: {err}\n"
-				"Perhaps you have to disable the firewall or simple file sharing on the windows machine (folder options)?"
-			) from err
-
-		logger.notice("Copying installation files")
-		self.mounted_oca_dir = os.path.join(self.mount_point, "opsi.org", "tmp", "opsi-client-agent_inst")
-		os.makedirs(self.mounted_oca_dir, exist_ok=True)
-
-		shutil.copytree("files", self.mounted_oca_dir)
-		shutil.copytree("custom", self.mounted_oca_dir)
-		shutil.copy("setup.opsiscript", self.mounted_oca_dir)
-		shutil.copy("oca-installation-helper.exe", self.mounted_oca_dir)
-		return "c:\\opsi.org\\tmp\\opsi-client-agent_inst"
 
 	def run_installation(self, remote_folder):
 		logger.info("Deploying from path %s", remote_folder)
@@ -243,29 +189,12 @@ class WindowsDeployThread(DeployThread):
 
 	def cleanup(self, remote_folder):
 		logger.notice("Cleaning up")
-
-		if self.mounted_oca_dir:  # in case of serverside mount
-			try:
-				shutil.rmtree(self.mounted_oca_dir)
-			except OSError as err:
-				logger.debug("Removing %s failed: %s", self.mounted_oca_dir, err, exc_info=True)
-		elif remote_folder:  # in case of smbclient
-			try:
-				cmd = f'cmd.exe /C "rmdir /s /q {remote_folder}'
-				# cleanup is not allowed to take longer than 2 minutes
-				self.wmi_exec(cmd, timeout=120)
-			except Exception as err:  # pylint: disable=broad-except
-				logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
-
-		if self.mount_point:
-			try:
-				execute(f"umount {self.mount_point}")
-			except Exception as err:  # pylint: disable=broad-except
-				logger.warning("Unmounting %s failed: %s", self.mount_point, err, exc_info=True)
-			try:
-				os.rmdir(self.mount_point)
-			except OSError as err:
-				logger.debug("Removing %s failed: %s", self.mount_point, err, exc_info=True)
+		try:
+			register_session(server=self.network_address, username=self.username, password=self.password)
+			if smbshutil.isdir(remote_folder):
+				smbshutil.rmtree(remote_folder)
+		except Exception as err:  # pylint: disable=broad-except
+			logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
 
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
