@@ -28,6 +28,7 @@ installed via opsi.
 """
 import sys
 import argparse
+import traceback
 from pathlib import Path
 import paramiko  # type: ignore[import]
 
@@ -227,4 +228,14 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+	try:
+		main()
+	except SystemExit as err:
+		sys.exit(err.code)
+	except KeyboardInterrupt:
+		print("Interrupted", file=sys.stderr)
+		sys.exit(1)
+	except Exception:  # pylint: disable=broad-except
+		# Do not let pyinstaller handle exceptions
+		traceback.print_exc()
+		sys.exit(1)
