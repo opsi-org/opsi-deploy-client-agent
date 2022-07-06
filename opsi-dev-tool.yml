@@ -13,10 +13,6 @@ pyinstaller-poetry:
       - OPSI.Backend.SQLite
       - OPSI.Util.Ping
       - OPSI.Util.WIM
-    windows: []
-    linux:
-      - paramiko
-    darwin:
       - paramiko
   extra_args:
     darwin:
@@ -27,7 +23,9 @@ pyinstaller-poetry:
       binaries:
         - opsi-deploy-client-agent
   before_script:
-    linux: []
+    linux:
+      # Conflicts with smbclient package
+      - rm .venv/bin/smbclient.py || true
     darwin: []
     windows: []
   data_files: []
