@@ -158,7 +158,9 @@ class WindowsDeployThread(DeployThread):
 					smbshutil.copy2(src, dst)
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
+			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
 			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-client-agent_inst"
+			smbshutil.makedirs(log_folder, exist_ok=True)
 			if smbshutil.isdir(remote_folder):
 				smbshutil.rmtree(remote_folder)
 			smbshutil.makedirs(remote_folder)
@@ -175,11 +177,13 @@ class WindowsDeployThread(DeployThread):
 		logger.info("Deploying from path %s", remote_folder)
 		install_command = (
 			f"{remote_folder}/oca-installation-helper.exe"
+			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
+			f" --log-level debug"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
 			f" --service-username {self.host_object.id}"
 			f" --service-password {self.host_object.opsiHostKey}"
 			f" --client-id {self.host_object.id}"
-			f" --no-gui --non-interactive"
+			" --no-gui --non-interactive"
 		)
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
