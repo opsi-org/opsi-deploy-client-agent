@@ -45,7 +45,7 @@ def get_process(i_wbem_services, handle):
 @contextmanager
 def dcom_connection(host, username, password):
 	dcom = None
-	domain = None
+	domain = ''
 	if '\\' in username:
 		domain, username = username.split('\\', 1)
 		username = username.strip('\\')
