@@ -127,17 +127,18 @@ class WindowsDeployThread(DeployThread):
 			logger.info("Timeout is %s seconds", timeout)
 			prop = win32_process.Create(f'cmd.exe /Q /c {cmd}', "c:\\", None).getProperties()
 
-			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
 			start_time = time.time()
+			time.sleep(5)
+			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
 			while time.time() - start_time < timeout:
 				if not process_object:
-					logger.debug("Finished process execution.")
+					logger.notice("Installation process ended")
 					break
 				logger.debug("Waiting for completion, time is %.2f s", time.time() - start_time)
 				time.sleep(PROCESS_CHECK_INTERVAL)
 				process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
 			else:
-				logger.error("Process reached timeout, killing process.")
+				logger.error("Process reached timeout, killing process")
 				process_object.Terminate(1)
 
 	def wmi_query(self, query, host=None):
