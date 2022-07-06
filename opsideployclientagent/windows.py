@@ -15,6 +15,10 @@ import re
 import os
 import ntpath
 import logging
+import random
+import string
+from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
+from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
@@ -126,9 +130,17 @@ class WindowsDeployThread(DeployThread):
 			logger.notice("Executing '%s' on host '%s'", cmd, host)
 			logger.info("Timeout is %s seconds", timeout)
 			prop = win32_process.Create(f'cmd.exe /Q /c {cmd}', "c:\\", None).getProperties()
+			if prop['ReturnValue']['value'] != 0:
+				error = {
+					2: "Access denied",
+					3: "Insufficient privilege",
+					8: "Unknown failure",
+					9: "Path not found",
+					21: "Invalid parameter"
+				}.get(prop['ReturnValue']['value'], "Unknown error")
+				raise RuntimeError(f"Failed to execute process: {error}")
 
 			start_time = time.time()
-			time.sleep(5)
 			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
 			while time.time() - start_time < timeout:
 				if not process_object:
@@ -147,6 +159,91 @@ class WindowsDeployThread(DeployThread):
 			query_result = i_wbem_services.ExecQuery(query)
 			logger.notice("Querying '%s' on host '%s'", query, host)
 			return query_result.Next(0xffffffff, 1)[0]
+
+	def tsch_exec(self, cmd, host=None, timeout=None):
+		cmd = forceUnicode(cmd)
+		timeout = timeout or PROCESS_MAX_TIMEOUT
+		host, username, password = self.get_connection_data(host)
+		domain = ''
+		if '\\' in username:
+			domain, username = username.split('\\', 1)
+			username = username.strip('\\')
+		elif '@' in username:
+			username, domain = username.split('@', 1)
+
+		xml = f"""<?xml version="1.0" encoding="UTF-16"?>
+		<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+			<Triggers>
+				<CalendarTrigger>
+				<StartBoundary>2015-07-15T20:35:13.2757294</StartBoundary>
+				<Enabled>true</Enabled>
+				<ScheduleByDay>
+					<DaysInterval>1</DaysInterval>
+				</ScheduleByDay>
+				</CalendarTrigger>
+			</Triggers>
+			<Principals>
+				<Principal id="LocalSystem">
+				<UserId>S-1-5-18</UserId>
+				<RunLevel>HighestAvailable</RunLevel>
+				</Principal>
+			</Principals>
+			<Settings>
+				<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+				<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+				<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+				<AllowHardTerminate>true</AllowHardTerminate>
+				<RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+				<IdleSettings>
+				<StopOnIdleEnd>true</StopOnIdleEnd>
+				<RestartOnIdle>false</RestartOnIdle>
+				</IdleSettings>
+				<AllowStartOnDemand>true</AllowStartOnDemand>
+				<Enabled>true</Enabled>
+				<Hidden>true</Hidden>
+				<RunOnlyIfIdle>false</RunOnlyIfIdle>
+				<WakeToRun>false</WakeToRun>
+				<ExecutionTimeLimit>P3D</ExecutionTimeLimit>
+				<Priority>7</Priority>
+			</Settings>
+			<Actions Context="LocalSystem">
+				<Exec>
+				<Command>powershell.exe</Command>
+				<Arguments>-ExecutionPolicy Bypass -Command {cmd}</Arguments>
+				</Exec>
+			</Actions>
+		</Task>
+		"""
+		logger.debug("Scheduled task xml: %s", xml)
+
+		string_binding = fr'ncacn_np:{host}[\pipe\atsvc]'
+		rpctransport = transport.DCERPCTransportFactory(string_binding)
+		rpctransport.set_credentials(domain=domain, username=username, password=password)
+
+		dce = rpctransport.get_dce_rpc()
+		dce.set_auth_level(RPC_C_AUTHN_LEVEL_PKT_PRIVACY)
+		dce.connect()
+
+		dce.bind(tsch.MSRPC_UUID_TSCHS)
+		task_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+		logger.info("Register scheduled task %r", task_name)
+		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
+		tsch.hSchRpcRun(dce, f'\\{task_name}')
+
+		start_time = time.time()
+		while time.time() - start_time < timeout:
+			resp = tsch.hSchRpcGetLastRunInfo(dce, f'\\{task_name}')
+			if resp['pLastRuntime']['wYear'] != 0:
+				logger.notice("Installation process ended")
+				break
+			time.sleep(2)
+		else:
+			logger.error("Task reached timeout, stopping task")
+			tsch.SchRpcStop(dce, f'\\{task_name}')
+
+		time.sleep(3)
+		tsch.hSchRpcDelete(dce, f'\\{task_name}')
+		dce.disconnect()
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
@@ -195,7 +292,7 @@ class WindowsDeployThread(DeployThread):
 		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
-			self.wmi_exec(install_command, timeout=self.install_timeout)
+			self.tsch_exec(install_command, timeout=self.install_timeout)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
@@ -213,7 +310,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				# finalization is not allowed to take longer than 2 minutes
-				self.wmi_exec(cmd, timeout=120)
+				self.tsch_exec(cmd, timeout=120)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
