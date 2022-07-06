@@ -167,7 +167,6 @@ class WindowsDeployThread(DeployThread):
 				smbshutil.rmtree(remote_folder)
 			smbshutil.makedirs(remote_folder)
 			copy_dir("files", remote_folder)
-			copy_dir("custom", remote_folder)
 			smbshutil.copy2("setup.opsiscript", remote_folder)
 			smbshutil.copy2("oca-installation-helper.exe", remote_folder)
 			return remote_folder
