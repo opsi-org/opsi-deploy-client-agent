@@ -170,8 +170,11 @@ class WindowsDeployThread(DeployThread):
 			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-client-agent_inst"
 			smbshutil.makedirs(log_folder, exist_ok=True)
 			if smbshutil.isdir(remote_folder):
-				smbshutil.rmtree(remote_folder)
-			smbshutil.makedirs(remote_folder)
+				try:
+					smbshutil.rmtree(remote_folder)
+				except Exception as err:  # pylint: disable=broad-except
+					logger.warning(err)
+			smbshutil.makedirs(remote_folder, exist_ok=True)
 			copy_dir("files", remote_folder)
 			smbshutil.copy2("setup.opsiscript", remote_folder)
 			smbshutil.copy2("oca-installation-helper.exe", remote_folder)
