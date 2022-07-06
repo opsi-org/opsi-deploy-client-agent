@@ -45,9 +45,15 @@ def get_process(i_wbem_services, handle):
 @contextmanager
 def dcom_connection(host, username, password):
 	dcom = None
+	domain = None
+	if '\\' in username:
+		domain, username = username.split('\\', 1)
+		username = username.strip('\\')
+	elif '@' in username:
+		username, domain = username.split('@', 1)
 	try:
 		logger.info("Establishing connection with dcom of host '%s'.", host)
-		dcom = DCOMConnection(host, username=username, password=password, oxidResolver=True)
+		dcom = DCOMConnection(host, domain=domain, username=username, password=password, oxidResolver=True)
 
 		i_wbem_level_1_login = wmi.IWbemLevel1Login(
 			dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login)
