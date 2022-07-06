@@ -174,9 +174,10 @@ class WindowsDeployThread(DeployThread):
 			raise FiletransferUnsuccessful from error
 
 	def run_installation(self, remote_folder):
-		logger.info("Deploying from path %s", remote_folder)
+		folder = re.sub(r".+c\$", r"c:\\", remote_folder)
+		logger.info("Deploying from path %s", folder)
 		install_command = (
-			f"{remote_folder}/oca-installation-helper.exe"
+			fr"{folder}\oca-installation-helper.exe"
 			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
 			f" --log-level debug"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
