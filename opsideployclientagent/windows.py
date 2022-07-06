@@ -14,6 +14,7 @@ import time
 import re
 import os
 import ntpath
+import logging
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
@@ -25,6 +26,9 @@ from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
 PROCESS_CHECK_INTERVAL = 5  # seconds
 PROCESS_MAX_TIMEOUT = 3600
+
+smbclient_logger = logging.getLogger("smbclient")
+smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
 
 
 def get_process(i_wbem_services, handle):
