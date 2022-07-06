@@ -208,8 +208,8 @@ class WindowsDeployThread(DeployThread):
 			</Settings>
 			<Actions Context="LocalSystem">
 				<Exec>
-				<Command>cmd.exe</Command>
-				<Arguments>/Q /c {cmd}</Arguments>
+				<Command>powershell.exe</Command>
+				<Arguments>-ExecutionPolicy Bypass -Command {cmd}</Arguments>
 				</Exec>
 			</Actions>
 		</Task>
@@ -228,22 +228,30 @@ class WindowsDeployThread(DeployThread):
 		task_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
 		logger.info("Register scheduled task %r", task_name)
 		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
-		tsch.hSchRpcRun(dce, f'\\{task_name}')
+		try:
+			resp = tsch.hSchRpcRun(dce, f'\\{task_name}')
+			logger.debug(resp.dump())
+			guid = resp['pGuid']
+			logger.info("Scheduled task started")
 
-		start_time = time.time()
-		while time.time() - start_time < timeout:
-			resp = tsch.hSchRpcGetLastRunInfo(dce, f'\\{task_name}')
-			if resp['pLastRuntime']['wYear'] != 0:
-				logger.notice("Installation process ended")
-				break
-			time.sleep(2)
-		else:
-			logger.error("Task reached timeout, stopping task")
-			tsch.SchRpcStop(dce, f'\\{task_name}')
-
-		time.sleep(3)
-		tsch.hSchRpcDelete(dce, f'\\{task_name}')
-		dce.disconnect()
+			start_time = time.time()
+			while time.time() - start_time < timeout:
+				try:
+					resp = tsch.hSchRpcGetInstanceInfo(dce, guid)
+					logger.debug(resp.dump())
+					time.sleep(3)
+				except tsch.DCERPCSessionError as err:
+					# SCHED_E_TASK_NOT_RUNNING
+					logger.debug(err)
+					logger.info("Scheduled task ended")
+					break
+			else:
+				logger.error("Task reached timeout, stopping task")
+				tsch.SchRpcStop(dce, f'\\{task_name}')
+		finally:
+			time.sleep(1)
+			tsch.hSchRpcDelete(dce, f'\\{task_name}')
+			dce.disconnect()
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
