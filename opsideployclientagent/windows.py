@@ -168,9 +168,8 @@ class WindowsDeployThread(DeployThread):
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
-			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-client-agent_inst"
+			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 			smbshutil.makedirs(log_folder, exist_ok=True)
-			smbshutil.rmtree(remote_folder)
 			smbshutil.makedirs(remote_folder)
 			copy_dir("files", remote_folder)
 			smbshutil.copy2("setup.opsiscript", remote_folder)
