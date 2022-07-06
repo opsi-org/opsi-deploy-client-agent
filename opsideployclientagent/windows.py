@@ -17,7 +17,7 @@ from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
-from smbclient import shutil as smbshutil, register_session  # type: ignore[import]
+from smbclient import shutil as smbshutil, register_session  # type: ignore[import]  # pylint: disable=no-name-in-module
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
