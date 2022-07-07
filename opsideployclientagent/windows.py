@@ -120,6 +120,9 @@ class WindowsDeployThread(DeployThread):
 		return host, username, password
 
 	def wmi_exec(self, cmd, host=None, timeout=None):
+		# WMI exec requires to logon the given user.
+		# This will fail in a lot of cases.
+		# See https://www.sysadmins.lv/retired-msft-blogs/alejacma/win32processcreate-fails-if-user-profile-is-not-loaded.aspx
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
@@ -225,7 +228,7 @@ class WindowsDeployThread(DeployThread):
 		dce.connect()
 
 		dce.bind(tsch.MSRPC_UUID_TSCHS)
-		task_name = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(8))
+		task_name = "opsi-deploy-client-agent-" + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
 		logger.info("Register scheduled task %r", task_name)
 		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
 		try:
