@@ -29,8 +29,10 @@ from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 PROCESS_CHECK_INTERVAL = 5  # seconds
 PROCESS_MAX_TIMEOUT = 3600
 
-smbclient_logger = logging.getLogger("smbprotocol.open")
-smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
+for _logger in ("smbprotocol.open", "smbprotocol.tree"):
+	smbclient_logger = logging.getLogger(_logger)
+	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment]
+	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
 
 
 def get_process(i_wbem_services, handle):
