@@ -248,6 +248,7 @@ class WindowsDeployThread(DeployThread):
 				tsch.SchRpcStop(dce, f'\\{task_name}')
 		finally:
 			time.sleep(1)
+			logger.info("Removing scheduled task %r", task_name)
 			tsch.hSchRpcDelete(dce, f'\\{task_name}')
 			dce.disconnect()
 
