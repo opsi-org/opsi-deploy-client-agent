@@ -311,16 +311,15 @@ class WindowsDeployThread(DeployThread):
 		cmd = ""
 		if self.finalize_action == "reboot":
 			logger.notice("Rebooting machine %s", self.network_address)
-			cmd = r'"shutdown.exe" /r /t 30 /c "opsi-client-agent installed - reboot"'
+			cmd = r'shutdown.exe /r /t 30 /c "opsi-client-agent installed - reboot"'
 		elif self.finalize_action == "shutdown":
 			logger.notice("Shutting down machine %s", self.network_address)
-			cmd = r'"shutdown.exe" /s /t 30 /c "opsi-client-agent installed - shutdown"'
+			cmd = r'shutdown.exe /s /t 30 /c "opsi-client-agent installed - shutdown"'
 		# start_service is performed as last action of the setup.opsiscript
 		# default case is do nothing
 		if cmd:
 			try:
-				# finalization is not allowed to take longer than 2 minutes
-				self.tsch_exec(cmd, timeout=120)
+				self.tsch_exec(cmd, timeout=30)
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
