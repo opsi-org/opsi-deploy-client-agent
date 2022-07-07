@@ -330,6 +330,7 @@ class WindowsDeployThread(DeployThread):
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
 			if smbshutil.isdir(self.remote_folder):
+				logger.info("Deleting remote folder: %s", self.remote_folder)
 				smbshutil.rmtree(self.remote_folder)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Cleanup failed: %s", err)

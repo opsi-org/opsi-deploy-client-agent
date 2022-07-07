@@ -61,13 +61,6 @@ def get_password(password: str) -> str:
 	return password
 
 
-def stop_deploy_threads(threads):
-	for thread in threads:
-		thread.stop()
-	for thread in threads:
-		if thread.is_alive():
-			logger.info("Waiting for %s to end", thread)
-			thread.join(120)
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
@@ -137,13 +130,14 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		raise ValueError(f"Group {group} does not exist")
 
 	total = 0
-	fails = 0
+	success = 0
 	skips = 0
 	failed_clients = {}
 
 	running_threads = []
-	try:
-		while hosts or running_threads:
+
+	while hosts or running_threads:
+		try:
 			if hosts and len(running_threads) < max_threads:
 				# start new thread
 				host = hosts.pop()
@@ -186,21 +180,21 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 				else:
 					if thread.result == "clientskipped":
 						skips += 1
-					elif thread.result != "success":
-						fails += 1
+					elif thread.result == "success":
+						success += 1
 						failed_clients.update({thread.host: thread.result})
 			running_threads = new_running_threads
 			time.sleep(1)
-	except KeyboardInterrupt:
-		while True:
-			logger.notice("Waiting for deployments to end")
+		except KeyboardInterrupt:
 			try:
-				stop_deploy_threads(running_threads)
-				break
+				logger.notice("Waiting for deployments to end")
+				hosts = []
+				for thread in running_threads:
+					thread.stop()
 			except KeyboardInterrupt:
 				pass
 
-	success = total - fails - skips
+	fails = total - success - skips
 
 	logger.notice("%s/%s deployments successful", success, total)
 	if skips:
