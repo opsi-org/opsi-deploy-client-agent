@@ -31,7 +31,7 @@ PROCESS_MAX_TIMEOUT = 3600
 
 for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 	smbclient_logger = logging.getLogger(_logger)
-	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment]
+	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment,attr-defined]
 	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
 
 
@@ -106,8 +106,7 @@ class WindowsDeployThread(DeployThread):
 			install_timeout,
 		)
 
-		self.mount_point = None
-		self.mounted_oca_dir = None
+		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 
 	def get_connection_data(self, host):
 		host = forceUnicode(host or self.network_address)
@@ -272,19 +271,17 @@ class WindowsDeployThread(DeployThread):
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
-			remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 			smbshutil.makedirs(log_folder, exist_ok=True)
-			smbshutil.makedirs(remote_folder)
-			copy_dir("files", remote_folder)
-			smbshutil.copy2("setup.opsiscript", remote_folder)
-			smbshutil.copy2("oca-installation-helper.exe", remote_folder)
-			return remote_folder
+			smbshutil.makedirs(self.remote_folder)
+			copy_dir("files", self.remote_folder)
+			smbshutil.copy2("setup.opsiscript", self.remote_folder)
+			smbshutil.copy2("oca-installation-helper.exe", self.remote_folder)
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 
-	def run_installation(self, remote_folder):
-		folder = re.sub(r".+c\$", r"c:\\", remote_folder)
+	def run_installation(self):
+		folder = re.sub(r".+c\$", r"c:\\", self.remote_folder)
 		logger.info("Deploying from path %s", folder)
 		install_command = (
 			fr"{folder}\oca-installation-helper.exe"
@@ -320,14 +317,16 @@ class WindowsDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-	def cleanup(self, remote_folder):
+	def cleanup(self):
 		logger.notice("Cleaning up")
+		if not self.remote_folder:
+			return
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
-			if smbshutil.isdir(remote_folder):
-				smbshutil.rmtree(remote_folder)
+			if smbshutil.isdir(self.remote_folder):
+				smbshutil.rmtree(self.remote_folder)
 		except Exception as err:  # pylint: disable=broad-except
-			logger.debug("Removing %s failed: %s", remote_folder, err, exc_info=True)
+			logger.debug("Removing %s failed: %s", self.remote_folder, err, exc_info=True)
 
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip

@@ -141,6 +141,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.set_host_id(host)
 		self.host_object = None
 		self.install_timeout = install_timeout
+		self.remote_folder = None
 
 	def _detect_deployment_method(self, host):
 		if '.' not in host:
@@ -375,12 +376,11 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 			logger.notice("Starting deployment to host %s", self.host)
 			self.prepare_deploy()
-			remote_folder = None
 			try:
 				try:
-					remote_folder = self.copy_data()
+					self.copy_data()
 					logger.notice("Installing %s", self.product_id)
-					self.run_installation(remote_folder)
+					self.run_installation()
 					logger.debug("Evaluating success")
 					self.evaluate_success()  # throws Exception if fail
 					logger.info("Finalizing deployment")
@@ -406,16 +406,16 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 					self._remove_host_from_backend(self.host_object)
 
 			finally:
-				self.cleanup(remote_folder)
+				self.cleanup()
 
 	def copy_data(self):
 		raise NotImplementedError
 
-	def run_installation(self, remote_folder):  # pylint: disable=unused-argument
+	def run_installation(self):  # pylint: disable=unused-argument
 		raise NotImplementedError
 
 	def finalize(self):
 		raise NotImplementedError
 
-	def cleanup(self, remote_folder):  # pylint: disable=unused-argument
+	def cleanup(self):  # pylint: disable=unused-argument
 		raise NotImplementedError

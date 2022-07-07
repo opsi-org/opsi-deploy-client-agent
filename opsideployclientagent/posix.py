@@ -65,9 +65,9 @@ class PosixDeployThread(DeployThread):
 		self._ssh_connection = None
 		self._ssh_policy = ssh_policy
 		self.credentialsfile = None
+		self.remote_folder = os.path.join("/tmp", "opsi-client-agent")
 
 	def copy_data(self):
-		remote_folder = os.path.join("/tmp", "opsi-client-agent")
 		if getattr(sys, "frozen", False):
 			local_folder = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
 		else:
@@ -76,26 +76,25 @@ class PosixDeployThread(DeployThread):
 		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")  # clean up previous run
 		logger.notice("Copying installation scripts...")
 		try:
-			self._copy_over_ssh(os.path.join(local_folder, 'files'), remote_folder)
+			self._copy_over_ssh(os.path.join(local_folder, 'files'), self.remote_folder)
 			if not os.path.exists(os.path.join(local_folder, 'custom')):
 				os.makedirs(os.path.join(local_folder, 'custom'))
-			self._copy_over_ssh(os.path.join(local_folder, 'custom'), remote_folder)
-			self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(remote_folder, 'setup.opsiscript'))
-			self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(remote_folder, 'oca-installation-helper'))
-			return remote_folder
+			self._copy_over_ssh(os.path.join(local_folder, 'custom'), self.remote_folder)
+			self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(self.remote_folder, 'setup.opsiscript'))
+			self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(self.remote_folder, 'oca-installation-helper'))
 		except Exception as error:
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 
-	def run_installation(self, remote_folder):
+	def run_installation(self):
 		if self.target_os == "linux":
-			self._execute_via_ssh(f"chmod +x {remote_folder}/files/opsi-script/opsi-*")
+			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script/opsi-*")
 		elif self.target_os == "macos":
-			self._execute_via_ssh(f"chmod +x {remote_folder}/files/opsi-script.app/Contents/MacOS/opsi-*")
-		self._execute_via_ssh(f"chmod +x {remote_folder}/oca-installation-helper")
+			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script.app/Contents/MacOS/opsi-*")
+		self._execute_via_ssh(f"chmod +x {self.remote_folder}/oca-installation-helper")
 
 		install_command = (
-			f"{remote_folder}/oca-installation-helper"
+			f"{self.remote_folder}/oca-installation-helper"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
 			f" --service-username {self.host_object.id}"
 			f" --service-password {self.host_object.opsiHostKey}"
@@ -103,7 +102,7 @@ class PosixDeployThread(DeployThread):
 			f" --no-gui --non-interactive"
 		)
 		if self.username != "root":
-			credentialsfile = os.path.join(remote_folder, ".credentials")
+			credentialsfile = os.path.join(self.remote_folder, ".credentials")
 			logger.notice("Writing credentialsfile %s", credentialsfile)
 			self._execute_via_ssh(f"touch {credentialsfile}")
 			self._execute_via_ssh(f"chmod 600 {credentialsfile}")
@@ -135,11 +134,12 @@ class PosixDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-	def cleanup(self, remote_folder):
+	def cleanup(self):
 		try:
-			if remote_folder:  # remote_folder includes credentialsfile if any
-				# cleanup is not allowed to take longer than 2 minutes
-				self._execute_via_ssh(f"rm -rf {remote_folder}", timeout=120)
+			if self.remote_folder:
+				# remote_folder includes credentialsfile if any
+				# Cleanup is not allowed to take longer than 2 minutes
+				self._execute_via_ssh(f"rm -rf {self.remote_folder}", timeout=120)
 		except Exception:  # pylint: disable=broad-except
 			logger.error("Cleanup failed")
 
