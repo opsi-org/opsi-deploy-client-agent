@@ -175,18 +175,15 @@ class WindowsDeployThread(DeployThread):
 		xml = f"""<?xml version="1.0" encoding="UTF-16"?>
 		<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
 			<Triggers>
-				<CalendarTrigger>
-				<StartBoundary>2015-07-15T20:35:13.2757294</StartBoundary>
-				<Enabled>true</Enabled>
-				<ScheduleByDay>
-					<DaysInterval>1</DaysInterval>
-				</ScheduleByDay>
-				</CalendarTrigger>
+				<TimeTrigger>
+					<StartBoundary>2000-01-01T00:00:00</StartBoundary>
+					<Enabled>true</Enabled>
+				</TimeTrigger>
 			</Triggers>
 			<Principals>
 				<Principal id="LocalSystem">
-				<UserId>S-1-5-18</UserId>
-				<RunLevel>HighestAvailable</RunLevel>
+					<UserId>S-1-5-18</UserId>
+					<RunLevel>HighestAvailable</RunLevel>
 				</Principal>
 			</Principals>
 			<Settings>
@@ -196,21 +193,21 @@ class WindowsDeployThread(DeployThread):
 				<AllowHardTerminate>true</AllowHardTerminate>
 				<RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
 				<IdleSettings>
-				<StopOnIdleEnd>true</StopOnIdleEnd>
-				<RestartOnIdle>false</RestartOnIdle>
+					<StopOnIdleEnd>true</StopOnIdleEnd>
+					<RestartOnIdle>false</RestartOnIdle>
 				</IdleSettings>
 				<AllowStartOnDemand>true</AllowStartOnDemand>
 				<Enabled>true</Enabled>
 				<Hidden>true</Hidden>
 				<RunOnlyIfIdle>false</RunOnlyIfIdle>
 				<WakeToRun>false</WakeToRun>
-				<ExecutionTimeLimit>P3D</ExecutionTimeLimit>
+				<ExecutionTimeLimit>P1D</ExecutionTimeLimit>
 				<Priority>7</Priority>
 			</Settings>
 			<Actions Context="LocalSystem">
 				<Exec>
-				<Command>cmd.exe</Command>
-				<Arguments>/Q /c {cmd}</Arguments>
+					<Command>cmd.exe</Command>
+					<Arguments>/Q /c {cmd}</Arguments>
 				</Exec>
 			</Actions>
 		</Task>
