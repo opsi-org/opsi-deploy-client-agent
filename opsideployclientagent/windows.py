@@ -106,7 +106,7 @@ class WindowsDeployThread(DeployThread):
 			install_timeout,
 		)
 
-		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
+		self.remote_folder = None
 
 	def get_connection_data(self, host):
 		host = forceUnicode(host or self.network_address)
@@ -253,6 +253,7 @@ class WindowsDeployThread(DeployThread):
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
+		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 
 		def copy_dir(src_dir, dst_dir):
 			"""Copy src_dir into dst_dir"""

@@ -65,9 +65,9 @@ class PosixDeployThread(DeployThread):
 		self._ssh_connection = None
 		self._ssh_policy = ssh_policy
 		self.credentialsfile = None
-		self.remote_folder = os.path.join("/tmp", "opsi-client-agent")
 
 	def copy_data(self):
+		self.remote_folder = os.path.join("/tmp", "opsi-client-agent")
 		if getattr(sys, "frozen", False):
 			local_folder = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
 		else:
