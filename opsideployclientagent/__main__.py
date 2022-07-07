@@ -28,7 +28,6 @@ installed via opsi.
 """
 import sys
 import argparse
-import traceback
 from pathlib import Path
 import paramiko  # type: ignore[import]
 
@@ -225,17 +224,3 @@ def main():
 		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None,
 	)
 	sys.exit(returncode)
-
-
-if __name__ == "__main__":
-	try:
-		main()
-	except SystemExit as err:
-		sys.exit(err.code)
-	except KeyboardInterrupt:
-		print("Interrupted", file=sys.stderr)
-		sys.exit(1)
-	except Exception:  # pylint: disable=broad-except
-		# Do not let pyinstaller handle exceptions
-		traceback.print_exc()
-		sys.exit(1)
