@@ -61,8 +61,6 @@ def get_password(password: str) -> str:
 	return password
 
 
-
-
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
 	hosts, target_os, host_file=None, password=None, max_threads=1,
 	deployment_method="auto", depot=None, group=None,
