@@ -142,6 +142,10 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self.host_object = None
 		self.install_timeout = install_timeout
 		self.remote_folder = None
+		self._should_stop = False
+
+	def stop(self):
+		self._should_stop = True
 
 	def _detect_deployment_method(self, host):
 		if '.' not in host:
@@ -380,6 +384,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 				try:
 					self.copy_data()
 					logger.notice("Installing %s", self.product_id)
+					if self._should_stop:
+						raise InterruptedError()
 					self.run_installation()
 					logger.debug("Evaluating success")
 					self.evaluate_success()  # throws Exception if fail

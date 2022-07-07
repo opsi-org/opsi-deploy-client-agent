@@ -61,6 +61,15 @@ def get_password(password: str) -> str:
 	return password
 
 
+def stop_deploy_threads(threads):
+	for thread in threads:
+		thread.stop()
+	for thread in threads:
+		if thread.is_alive():
+			logger.info("Waiting for %s to end", thread)
+			thread.join(120)
+
+
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
 	hosts, target_os, host_file=None, password=None, max_threads=1,
 	deployment_method="auto", depot=None, group=None,
@@ -133,54 +142,63 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	failed_clients = {}
 
 	running_threads = []
-	while hosts or running_threads:
-		if hosts and len(running_threads) < max_threads:
-			# start new thread
-			host = hosts.pop()
+	try:
+		while hosts or running_threads:
+			if hosts and len(running_threads) < max_threads:
+				# start new thread
+				host = hosts.pop()
 
-			client_config = {
-				"host": host,
-				"backend": backend,
-				"username": username,
-				"password": password,
-				"finalize_action": finalize_action,
-				"deployment_method": deployment_method,
-				"stop_on_ping_failure": stop_on_ping_failure,
-				"skip_existing_client": skip_existing_client,
-				"keep_client_on_failure": keep_client_on_failure,
-				"depot": depot,
-				"group": group,
-				"install_timeout": install_timeout
-			}
+				client_config = {
+					"host": host,
+					"backend": backend,
+					"username": username,
+					"password": password,
+					"finalize_action": finalize_action,
+					"deployment_method": deployment_method,
+					"stop_on_ping_failure": stop_on_ping_failure,
+					"skip_existing_client": skip_existing_client,
+					"keep_client_on_failure": keep_client_on_failure,
+					"depot": depot,
+					"group": group,
+					"install_timeout": install_timeout
+				}
 
+				try:
+					client_config['additional_client_settings'] = additional_host_infos[host]
+				except KeyError:
+					pass
+
+				if target_os in ("linux", "macos"):
+					client_config["ssh_policy"] = ssh_hostkey_policy or paramiko.WarningPolicy
+					client_config["target_os"] = target_os
+
+				thread = DeploymentClass(**client_config)
+				total += 1
+				thread.daemon = True
+				thread.start()
+				running_threads.append(thread)
+				time.sleep(0.5)
+
+			new_running_threads = []
+			for thread in running_threads:
+				if thread.is_alive():
+					new_running_threads.append(thread)
+				else:
+					if thread.result == "clientskipped":
+						skips += 1
+					elif thread.result != "success":
+						fails += 1
+						failed_clients.update({thread.host: thread.result})
+			running_threads = new_running_threads
+			time.sleep(1)
+	except KeyboardInterrupt:
+		while True:
+			logger.notice("Waiting for deployments to end")
 			try:
-				client_config['additional_client_settings'] = additional_host_infos[host]
-			except KeyError:
+				stop_deploy_threads(running_threads)
+				break
+			except KeyboardInterrupt:
 				pass
-
-			if target_os in ("linux", "macos"):
-				client_config["ssh_policy"] = ssh_hostkey_policy or paramiko.WarningPolicy
-				client_config["target_os"] = target_os
-
-			thread = DeploymentClass(**client_config)
-			total += 1
-			thread.daemon = True
-			thread.start()
-			running_threads.append(thread)
-			time.sleep(0.5)
-
-		new_running_threads = []
-		for thread in running_threads:
-			if thread.is_alive():
-				new_running_threads.append(thread)
-			else:
-				if thread.result == "clientskipped":
-					skips += 1
-				elif thread.result != "success":
-					fails += 1
-					failed_clients.update({thread.host: thread.result})
-		running_threads = new_running_threads
-		time.sleep(1)
 
 	success = total - fails - skips
 

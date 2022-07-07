@@ -22,7 +22,7 @@ from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
-from smbclient import shutil as smbshutil, register_session  # type: ignore[import]
+from smbclient import shutil as smbshutil, register_session, delete_session  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
@@ -237,7 +237,7 @@ class WindowsDeployThread(DeployThread):
 			while time.time() - start_time < timeout:
 				try:
 					resp = tsch.hSchRpcGetInstanceInfo(dce, guid)
-					time.sleep(3)
+					time.sleep(1)
 				except tsch.DCERPCSessionError as err:
 					# SCHED_E_TASK_NOT_RUNNING
 					logger.debug(err)
@@ -247,7 +247,6 @@ class WindowsDeployThread(DeployThread):
 				logger.error("Task reached timeout, stopping task")
 				tsch.SchRpcStop(dce, f'\\{task_name}')
 		finally:
-			time.sleep(1)
 			logger.info("Removing scheduled task %r", task_name)
 			tsch.hSchRpcDelete(dce, f'\\{task_name}')
 			dce.disconnect()
@@ -281,6 +280,8 @@ class WindowsDeployThread(DeployThread):
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
+		finally:
+			delete_session(server=self.network_address)
 
 	def run_installation(self):
 		folder = re.sub(r".+c\$", r"c:\\", self.remote_folder)
@@ -329,6 +330,8 @@ class WindowsDeployThread(DeployThread):
 				smbshutil.rmtree(self.remote_folder)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.debug("Removing %s failed: %s", self.remote_folder, err, exc_info=True)
+		finally:
+			delete_session(server=self.network_address)
 
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip
