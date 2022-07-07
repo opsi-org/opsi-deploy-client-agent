@@ -160,7 +160,7 @@ class WindowsDeployThread(DeployThread):
 			logger.notice("Querying '%s' on host '%s'", query, host)
 			return query_result.Next(0xffffffff, 1)[0]
 
-	def tsch_exec(self, cmd, host=None, timeout=None):
+	def tsch_exec(self, cmd, host=None, timeout=None):  # pylint: disable=too-many-locals
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
@@ -230,7 +230,7 @@ class WindowsDeployThread(DeployThread):
 		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
 		try:
 			resp = tsch.hSchRpcRun(dce, f'\\{task_name}')
-			#resp.dump()
+			# resp.dump()
 			guid = resp['pGuid']
 			logger.info("Scheduled task started")
 
