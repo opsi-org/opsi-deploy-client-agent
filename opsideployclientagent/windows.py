@@ -281,7 +281,10 @@ class WindowsDeployThread(DeployThread):
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 		finally:
-			delete_session(server=self.network_address)
+			try:
+				delete_session(server=self.network_address)
+			except Exception:  # pylint: disable=broad-except
+				pass
 
 	def run_installation(self):
 		folder = re.sub(r".+c\$", r"c:\\", self.remote_folder)
@@ -329,9 +332,12 @@ class WindowsDeployThread(DeployThread):
 			if smbshutil.isdir(self.remote_folder):
 				smbshutil.rmtree(self.remote_folder)
 		except Exception as err:  # pylint: disable=broad-except
-			logger.debug("Removing %s failed: %s", self.remote_folder, err, exc_info=True)
+			logger.error("Cleanup failed: %s", err)
 		finally:
-			delete_session(server=self.network_address)
+			try:
+				delete_session(server=self.network_address)
+			except Exception:  # pylint: disable=broad-except
+				pass
 
 	def ask_host_for_hostname(self, host):
 		# preferably host should be an ip

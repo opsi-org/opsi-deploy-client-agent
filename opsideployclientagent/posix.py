@@ -140,8 +140,8 @@ class PosixDeployThread(DeployThread):
 				# remote_folder includes credentialsfile if any
 				# Cleanup is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(f"rm -rf {self.remote_folder}", timeout=120)
-		except Exception:  # pylint: disable=broad-except
-			logger.error("Cleanup failed")
+		except Exception as err:  # pylint: disable=broad-except
+			logger.error("Cleanup failed: %s", err)
 
 		if self._ssh_connection is not None:
 			try:

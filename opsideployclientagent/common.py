@@ -385,7 +385,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 					self.copy_data()
 					logger.notice("Installing %s", self.product_id)
 					if self._should_stop:
-						raise InterruptedError()
+						self.result = "failed:aborted"
+						raise InterruptedError("Aborted")
 					self.run_installation()
 					logger.debug("Evaluating success")
 					self.evaluate_success()  # throws Exception if fail
