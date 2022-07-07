@@ -1,5 +1,6 @@
 pyinstaller-poetry:
   one_file: yes
+  strip: yes
   hidden_imports:
     all:
       - OPSI.Backend.DHCPD
