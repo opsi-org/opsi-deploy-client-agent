@@ -15,8 +15,6 @@ import re
 import os
 import ntpath
 import logging
-import random
-import string
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
@@ -228,7 +226,7 @@ class WindowsDeployThread(DeployThread):
 		dce.connect()
 
 		dce.bind(tsch.MSRPC_UUID_TSCHS)
-		task_name = "opsi-deploy-client-agent-" + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(8))
+		task_name = f"opsi-deploy-client-agent-{int(time.time())}"
 		logger.info("Register scheduled task %r", task_name)
 		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
 		try:
