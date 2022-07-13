@@ -270,8 +270,7 @@ class WindowsDeployThread(DeployThread):
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
 		execute(
 			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
-			" -c 'prompt; recurse;"
-			f" md opsi.org; cd opsi.org; md log; md tmp; cd tmp; md {folder_name};"
+			f" -c 'prompt; recurse; md opsi.org; cd opsi.org; md log; md tmp; cd tmp; md {folder_name};"
 			f" cd {folder_name}; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
 		)
 
@@ -351,8 +350,7 @@ class WindowsDeployThread(DeployThread):
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
 		execute(
 			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
-			" -c 'prompt; recurse;"
-			f"deltree {self.remote_folder}; exit;'"
+			f" -c 'prompt; recurse; deltree {self.remote_folder}; exit;'"
 		)
 
 	def cleanup_files_smbprotocol(self):
