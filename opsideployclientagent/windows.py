@@ -14,6 +14,7 @@ import ntpath
 import os
 import re
 import time
+import shutil
 from contextlib import contextmanager
 
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
@@ -25,9 +26,8 @@ from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
 from smbclient import delete_session, register_session  # type: ignore[import]
 from smbclient import shutil as smbshutil  # type: ignore[import]
-from smbprotocol.structure import FlagField  # type: ignore[import]
 
-from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
+from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful, execute
 
 PROCESS_CHECK_INTERVAL = 5  # seconds
 PROCESS_MAX_TIMEOUT = 3600
@@ -36,26 +36,6 @@ for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 	smbclient_logger = logging.getLogger(_logger)
 	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment,attr-defined]
 	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
-
-
-# Windows 7 workaround for "ValueError: Invalid flag for field flag value set 4"
-def _parse_value(self, value):
-	int_value = super(FlagField, self)._parse_value(value)  # pylint: disable=protected-access
-	current_val = int_value
-	for value in vars(self.flag_type).values():
-		if isinstance(value, int):
-			current_val &= ~value
-	if current_val != 0 and self.flag_strict:
-		err = f"Invalid flag for field {self.name} value set {current_val}"
-		if self.name == "flag" and current_val == 4:
-			logger.warning(err)
-		else:
-			raise ValueError(err)
-
-	return int_value
-
-
-FlagField._parse_value = _parse_value
 
 
 def get_process(i_wbem_services, handle):
@@ -130,6 +110,7 @@ class WindowsDeployThread(DeployThread):
 		)
 
 		self.remote_folder = None
+		self.smbclient_cmd = shutil.which('smbclient')
 
 	def get_connection_data(self, host):
 		host = forceUnicode(host or self.network_address)
@@ -276,6 +257,25 @@ class WindowsDeployThread(DeployThread):
 
 	def copy_data(self):
 		logger.notice("Copying installation files")
+		if self.smbclient_cmd:
+			logger.info("Using smbclient to copy files")
+			return self.copy_data_smbclient()
+		logger.info("Using smbprotocol to copy files")
+		return self.copy_data_smbprotocol()
+
+	def copy_data_smbclient(self):
+		folder_name = f"opsi-deploy-client-agent-{int(time.time())}"
+		self.remote_folder = rf"c:\opsi.org\tmp\{folder_name}"
+		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
+		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
+		execute(
+			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
+			" -c 'prompt; recurse;"
+			f" md opsi.org; cd opsi.org; md log; md tmp; cd tmp; md {folder_name};"
+			f" cd {folder_name}; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
+		)
+
+	def copy_data_smbprotocol(self):
 		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 
 		def copy_dir(src_dir, dst_dir):
@@ -346,15 +346,32 @@ class WindowsDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
+	def cleanup_files_smbclient(self):
+		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
+		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
+		execute(
+			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
+			" -c 'prompt; recurse;"
+			f"deltree {self.remote_folder}; exit;'"
+		)
+
+	def cleanup_files_smbprotocol(self):
+		register_session(server=self.network_address, username=self.username, password=self.password)
+		if smbshutil.isdir(self.remote_folder):
+			logger.info("Deleting remote folder: %s", self.remote_folder)
+			smbshutil.rmtree(self.remote_folder)
+
 	def cleanup(self):
 		logger.notice("Cleaning up")
 		if not self.remote_folder:
 			return
 		try:
-			register_session(server=self.network_address, username=self.username, password=self.password)
-			if smbshutil.isdir(self.remote_folder):
-				logger.info("Deleting remote folder: %s", self.remote_folder)
-				smbshutil.rmtree(self.remote_folder)
+			if self.smbclient_cmd:
+				logger.info("Using smbclient to cleanup files")
+				self.cleanup_files_smbclient()
+			else:
+				logger.info("Using smbprotocol to cleanup files")
+				self.cleanup_files_smbprotocol()
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error("Cleanup failed: %s", err)
 		finally:
