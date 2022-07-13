@@ -9,20 +9,23 @@ windows deployment module
 This module contains the class WindowsDeployThread and related methods.
 """
 
-from contextlib import contextmanager
-import time
-import re
-import os
-import ntpath
 import logging
+import ntpath
+import os
+import re
+import time
+from contextlib import contextmanager
+
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
-from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
-from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
+from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
+from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
 from opsicommon.logging import logger  # type: ignore[import]
 from opsicommon.types import forceUnicode  # type: ignore[import]
-from smbclient import shutil as smbshutil, register_session, delete_session  # type: ignore[import]
+from smbclient import delete_session, register_session  # type: ignore[import]
+from smbclient import shutil as smbshutil  # type: ignore[import]
+from smbprotocol.structure import FlagField  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
@@ -33,6 +36,26 @@ for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 	smbclient_logger = logging.getLogger(_logger)
 	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment,attr-defined]
 	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
+
+
+# Windows 7 workaround for "ValueError: Invalid flag for field flag value set 4"
+def _parse_value(self, value):
+	int_value = super(FlagField, self)._parse_value(value)  # pylint: disable=protected-access
+	current_val = int_value
+	for value in vars(self.flag_type).values():
+		if isinstance(value, int):
+			current_val &= ~value
+	if current_val != 0 and self.flag_strict:
+		err = f"Invalid flag for field {self.name} value set {current_val}"
+		if self.name == "flag" and current_val == 4:
+			logger.warning(err)
+		else:
+			raise ValueError(err)
+
+	return int_value
+
+
+FlagField._parse_value = _parse_value
 
 
 def get_process(i_wbem_services, handle):
