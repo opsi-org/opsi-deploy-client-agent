@@ -27,12 +27,7 @@ build:linux-pyinstaller:
     - poetry install
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
-    - poetry run opsi-dev-tool --pyinstaller-poetry-build -l info
+    - poetry run opsi-dev-cli -l info pyinstaller build
     - ./dist/opsi-deploy-client-agent --version
-    - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent "$CI_JOB_ID"'
-    - '[ "$CI_COMMIT_TAG" = "" ] || opsi-dev-tool -l info --binary-push dist/opsi-deploy-client-agent'
-  artifacts:
-    name: 'deploy-linux-pyinstaller'
-    paths:
-      - dist/opsi-deploy-client-agent
-    expire_in: 2 day
+    - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent --prerelease="$CI_JOB_ID"'
+    - '[ "$CI_COMMIT_TAG" = "" ] || opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent'

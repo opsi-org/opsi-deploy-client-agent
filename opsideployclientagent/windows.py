@@ -13,8 +13,8 @@ import logging
 import ntpath
 import os
 import re
-import time
 import shutil
+import time
 from contextlib import contextmanager
 
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
@@ -41,7 +41,7 @@ for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 def get_process(i_wbem_services, handle):
 	try:
 		i_enum_wbem_class_object = i_wbem_services.ExecQuery(f"SELECT * from Win32_Process where handle = {handle}")
-		process_object = i_enum_wbem_class_object.Next(0xffffffff, 1)[0]
+		process_object = i_enum_wbem_class_object.Next(0xFFFFFFFF, 1)[0]
 		# logger.debug(process_object.Name, process_object.Status, process_object.TerminationDate)
 		return process_object
 	except wmi.DCERPCSessionError:
@@ -52,20 +52,18 @@ def get_process(i_wbem_services, handle):
 @contextmanager
 def dcom_connection(host, username, password):
 	dcom = None
-	domain = ''
-	if '\\' in username:
-		domain, username = username.split('\\', 1)
-		username = username.strip('\\')
-	elif '@' in username:
-		username, domain = username.split('@', 1)
+	domain = ""
+	if "\\" in username:
+		domain, username = username.split("\\", 1)
+		username = username.strip("\\")
+	elif "@" in username:
+		username, domain = username.split("@", 1)
 	try:
 		logger.info("Establishing connection with dcom of host '%s'.", host)
 		dcom = DCOMConnection(host, domain=domain, username=username, password=password, oxidResolver=True)
 
-		i_wbem_level_1_login = wmi.IWbemLevel1Login(
-			dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login)
-		)
-		i_wbem_services = i_wbem_level_1_login.NTLMLogin('//./root/cimv2', NULL, NULL)
+		i_wbem_level_1_login = wmi.IWbemLevel1Login(dcom.CoCreateInstanceEx(wmi.CLSID_WbemLevel1Login, wmi.IID_IWbemLevel1Login))
+		i_wbem_services = i_wbem_level_1_login.NTLMLogin("//./root/cimv2", NULL, NULL)
 		i_wbem_level_1_login.RemRelease()
 		yield i_wbem_services
 	except Exception as error:  # pylint: disable=broad-except
@@ -110,7 +108,7 @@ class WindowsDeployThread(DeployThread):
 		)
 
 		self.remote_folder = None
-		self.smbclient_cmd = shutil.which('smbclient')
+		self.smbclient_cmd = shutil.which("smbclient")
 
 	def get_connection_data(self, host):
 		host = forceUnicode(host or self.network_address)
@@ -132,29 +130,29 @@ class WindowsDeployThread(DeployThread):
 
 		with dcom_connection(host, username, password) as i_wbem_services:
 			logger.debug("Getting win32_process object.")
-			win32_process, _ = i_wbem_services.GetObject('Win32_Process')
+			win32_process, _ = i_wbem_services.GetObject("Win32_Process")
 			logger.notice("Executing '%s' on host '%s'", cmd, host)
 			logger.info("Timeout is %s seconds", timeout)
-			prop = win32_process.Create(f'cmd.exe /Q /c {cmd}', "c:\\", None).getProperties()
-			if prop['ReturnValue']['value'] != 0:
+			prop = win32_process.Create(f"cmd.exe /Q /c {cmd}", "c:\\", None).getProperties()
+			if prop["ReturnValue"]["value"] != 0:
 				error = {
 					2: "Access denied",
 					3: "Insufficient privilege",
 					8: "Unknown failure",
 					9: "Path not found",
-					21: "Invalid parameter"
-				}.get(prop['ReturnValue']['value'], "Unknown error")
+					21: "Invalid parameter",
+				}.get(prop["ReturnValue"]["value"], "Unknown error")
 				raise RuntimeError(f"Failed to execute process: {error}")
 
 			start_time = time.time()
-			process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+			process_object = get_process(i_wbem_services, prop["ProcessId"]["value"])
 			while time.time() - start_time < timeout:
 				if not process_object:
 					logger.notice("Installation process ended")
 					break
 				logger.debug("Waiting for completion, time is %.2f s", time.time() - start_time)
 				time.sleep(PROCESS_CHECK_INTERVAL)
-				process_object = get_process(i_wbem_services, prop['ProcessId']['value'])
+				process_object = get_process(i_wbem_services, prop["ProcessId"]["value"])
 			else:
 				logger.error("Process reached timeout, killing process")
 				process_object.Terminate(1)
@@ -164,18 +162,18 @@ class WindowsDeployThread(DeployThread):
 		with dcom_connection(host, username, password) as i_wbem_services:
 			query_result = i_wbem_services.ExecQuery(query)
 			logger.notice("Querying '%s' on host '%s'", query, host)
-			return query_result.Next(0xffffffff, 1)[0]
+			return query_result.Next(0xFFFFFFFF, 1)[0]
 
 	def tsch_exec(self, cmd, host=None, timeout=None):  # pylint: disable=too-many-locals
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
-		domain = ''
-		if '\\' in username:
-			domain, username = username.split('\\', 1)
-			username = username.strip('\\')
-		elif '@' in username:
-			username, domain = username.split('@', 1)
+		domain = ""
+		if "\\" in username:
+			domain, username = username.split("\\", 1)
+			username = username.strip("\\")
+		elif "@" in username:
+			username, domain = username.split("@", 1)
 
 		xml = f"""<?xml version="1.0" encoding="UTF-16"?>
 		<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -219,7 +217,7 @@ class WindowsDeployThread(DeployThread):
 		"""
 		logger.debug("Scheduled task xml: %s", xml)
 
-		string_binding = fr'ncacn_np:{host}[\pipe\atsvc]'
+		string_binding = rf"ncacn_np:{host}[\pipe\atsvc]"
 		rpctransport = transport.DCERPCTransportFactory(string_binding)
 		rpctransport.set_credentials(domain=domain, username=username, password=password)
 
@@ -230,14 +228,15 @@ class WindowsDeployThread(DeployThread):
 		dce.bind(tsch.MSRPC_UUID_TSCHS)
 		task_name = f"opsi-deploy-client-agent-{int(time.time())}"
 		logger.info("Register scheduled task %r", task_name)
-		tsch.hSchRpcRegisterTask(dce, f'\\{task_name}', xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
+		tsch.hSchRpcRegisterTask(dce, f"\\{task_name}", xml, tsch.TASK_CREATE, NULL, tsch.TASK_LOGON_NONE)
 		try:
-			resp = tsch.hSchRpcRun(dce, f'\\{task_name}')
+			resp = tsch.hSchRpcRun(dce, f"\\{task_name}")
 			# resp.dump()
-			guid = resp['pGuid']
+			guid = resp["pGuid"]
 			logger.info("Scheduled task started")
 
 			start_time = time.time()
+			time.sleep(5)
 			while time.time() - start_time < timeout:
 				try:
 					resp = tsch.hSchRpcGetInstanceInfo(dce, guid)
@@ -249,13 +248,19 @@ class WindowsDeployThread(DeployThread):
 					break
 			else:
 				logger.error("Task reached timeout, stopping task")
-				tsch.SchRpcStop(dce, f'\\{task_name}')
+				tsch.SchRpcStop(dce, f"\\{task_name}")
 		finally:
 			logger.info("Removing scheduled task %r", task_name)
-			tsch.hSchRpcDelete(dce, f'\\{task_name}')
+			tsch.hSchRpcDelete(dce, f"\\{task_name}")
 			dce.disconnect()
 
 	def copy_data(self):
+		target_os = self.wmi_query("SELECT * from Win32_OperatingSystem", host=self.network_address)
+		if target_os and hasattr(target_os, "Version"):
+			logger.info("Target os version: %s", target_os.Version)
+		else:
+			logger.warning("Did not get target os version.")
+
 		logger.notice("Copying installation files")
 		if self.smbclient_cmd:
 			logger.info("Using smbclient to copy files")
@@ -291,6 +296,7 @@ class WindowsDeployThread(DeployThread):
 					src = os.path.join(root, filename)
 					dst = ntpath.join(dst_dir, nt_path, filename)
 					smbshutil.copy2(src, dst)
+
 		try:
 			register_session(server=self.network_address, username=self.username, password=self.password)
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
@@ -312,7 +318,7 @@ class WindowsDeployThread(DeployThread):
 		folder = re.sub(r".+c\$", r"c:\\", self.remote_folder)
 		logger.info("Deploying from path %s", folder)
 		install_command = (
-			fr"{folder}\oca-installation-helper.exe"
+			rf"{folder}\oca-installation-helper.exe"
 			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
 			f" --log-level debug"
 			f" --service-address {self._get_service_address(self.host_object.id)}"
