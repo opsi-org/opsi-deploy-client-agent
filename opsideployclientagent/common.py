@@ -190,17 +190,14 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", self.host)
 			raise SkipClientException(f"Not deploying to server {self.host}.")
 
-	def _get_ip_address(self, host_id, host_name):
-		if self.deployment_method == 'ip':
-			return forceIPAddress(self.host)
-
-		logger.notice("Querying for ip address of host %s", host_id)
+	def _get_ip_address(self, host_name):
+		logger.notice("Querying for ip address of host %s", self.host)
 		ip_address = ''
-		logger.info("Getting host %s by name", host_id)
+		logger.info("Getting host %s by name", self.host)
 		try:
-			ip_address = socket.gethostbyname(host_id)
+			ip_address = socket.gethostbyname(self.host)
 		except Exception as err:  # pylint: disable=broad-except
-			logger.warning("Failed to get ip address for host %s by syscall: %s", host_id, err)
+			logger.warning("Failed to get ip address for host %s by syscall: %s", self.host, err)
 
 		if ip_address:
 			logger.notice("Got ip address %s from syscall", ip_address)
@@ -234,15 +231,15 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		else:
 			logger.warning("No ping response received from %s", ip_address)
 
-	def _create_host_if_not_existing(self, host_id, ip_address):
-		if not self.backend.host_getIdents(type='OpsiClient', id=host_id):
-			logger.notice("Getting hardware ethernet address of host %s", host_id)
+	def _create_host_if_not_existing(self, ip_address):
+		if not self.backend.host_getIdents(type='OpsiClient', id=self.host):
+			logger.notice("Getting hardware ethernet address of host %s", self.host)
 			mac = self._get_mac_address(ip_address)
 			if not mac:
 				logger.warning("Failed to get hardware ethernet address for IP %s", ip_address)
 
 			client_config = {
-				"id": host_id,
+				"id": self.host,
 				"hardwareAddress": mac,
 				"ipAddress": ip_address,
 				"description": "",
@@ -252,11 +249,11 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 				client_config.update(self.additional_client_settings)
 				logger.debug("Updated config now is: %s", client_config)
 
-			logger.notice("Creating client %s", host_id)
+			logger.notice("Creating client %s", self.host)
 			self.backend.host_createObjects([OpsiClient(**client_config)])
 			self._client_created_by_script = True
 
-	def _put_client_into_group(self, client_id):
+	def _put_client_into_group(self):
 		if not self.group:
 			return
 
@@ -264,29 +261,29 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			"type": "ObjectToGroup",
 			"groupType": "HostGroup",
 			"groupId": self.group,
-			"objectId": client_id,
+			"objectId": self.host,
 		}
 		try:
 			self.backend.objectToGroup_createObjects([mapping])
-			logger.notice("Added %s to group %s", client_id, self.group)
+			logger.notice("Added %s to group %s", self.host, self.group)
 		except Exception as err:  # pylint: disable=broad-except
-			logger.warning("Adding %s to group %s failed: %s", client_id, self.group, err)
+			logger.warning("Adding %s to group %s failed: %s", self.host, self.group, err)
 
-	def _assign_client_to_depot(self, client_id):
+	def _assign_client_to_depot(self):
 		if not self.depot:
 			return
 
 		depot_assignment = {
 			"configId": "clientconfig.depot.id",
 			"values": [self.depot],
-			"objectId": client_id,
+			"objectId": self.host,
 			"type": "ConfigState",
 		}
 		try:
 			self.backend.configState_createObjects([depot_assignment])
-			logger.notice("Assigned %s to depot %s", client_id, self.depot)
+			logger.notice("Assigned %s to depot %s", self.host, self.depot)
 		except Exception as err:  # pylint: disable=broad-except
-			logger.warning("Assgining %s to depot %s failed: %s", client_id, self.depot, err)
+			logger.warning("Assgining %s to depot %s failed: %s", self.host, self.depot, err)
 
 	@staticmethod
 	def _get_mac_address(ip_address):
@@ -313,11 +310,11 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			raise ValueError("No network address set!")
 		return self._network_address
 
-	def _set_network_address(self, host_id, host_name, ip_address):
+	def _set_network_address(self, host_name, ip_address):
 		if self.deployment_method == 'hostname':
 			self._network_address = host_name
 		elif self.deployment_method == 'fqdn':
-			self._network_address = host_id
+			self._network_address = self.host
 		else:
 			self._network_address = ip_address
 
@@ -332,10 +329,10 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		)
 		self.backend.productOnClient_updateObjects([poc])
 
-	def _remove_host_from_backend(self, host):
+	def _remove_host_from_backend(self):
 		try:
-			logger.notice("Deleting client %s from backend", host)
-			self.backend.host_deleteObjects([host])
+			logger.notice("Deleting client %s from backend", self.host)
+			self.backend.host_deleteObjects([self.host])
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error(err)
 
@@ -357,13 +354,13 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 	def prepare_deploy(self):
 		host_name = self.host.split('.')[0]
-		ip_address = self._get_ip_address(self.host, host_name)
+		ip_address = self._get_ip_address(host_name)
 		self._ping_client(ip_address)
-		self._set_network_address(self.host, host_name, ip_address)
+		self._set_network_address(host_name, ip_address)
 
-		self._create_host_if_not_existing(self.host, ip_address)
-		self._put_client_into_group(self.host)
-		self._assign_client_to_depot(self.host)
+		self._create_host_if_not_existing(ip_address)
+		self._put_client_into_group()
+		self._assign_client_to_depot()
 
 		self.host_object = self.backend.host_getObjects(type='OpsiClient', id=self.host)[0]
 		secret_filter.add_secrets(self.host_object.opsiHostKey)
@@ -410,7 +407,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 					self.result = "failed:unknownreason"
 				logger.error("Deployment to %s failed: %s", self.host, error)
 				if self._client_created_by_script and self.host_object and not self.keep_client_on_failure:
-					self._remove_host_from_backend(self.host_object)
+					self._remove_host_from_backend()
 
 			finally:
 				self.cleanup()
