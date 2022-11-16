@@ -4,11 +4,13 @@ test addresses
 basic tests for address handling of DeployThreads
 """
 
+import socket
 import pytest
 
 from opsideployclientagent.common import DeployThread
 
 BACKEND = None
+SUFFIX = ".".join(socket.getfqdn().split(".")[1:])
 
 
 @pytest.mark.parametrize(
@@ -37,8 +39,8 @@ def test_detect_deployment_method(host, method, result_method):
 	"host, result_host",
 	(
 		("localhost.domain.local", "localhost.domain.local"),
-		("127.0.0.1", "localhost.domain.local"),
-		("localhost", "localhost.domain.local"),
+		("127.0.0.1", f"localhost.{SUFFIX}"),
+		("localhost", f"localhost.{SUFFIX}"),
 	),
 )
 def test_set_host_id(host, result_host):
