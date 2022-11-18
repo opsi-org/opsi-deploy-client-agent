@@ -211,7 +211,7 @@ def main():
 		host_file=args.host_file,
 		password=args.password,
 		max_threads=args.max_threads,
-		deployment_method=args.deployment_method,
+		deployment_method=args.deployment_method or "auto",
 		depot=args.depot,
 		group=args.group,
 		username=args.username,
