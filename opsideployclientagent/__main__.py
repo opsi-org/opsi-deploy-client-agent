@@ -41,7 +41,7 @@ from opsideployclientagent.common import get_product_id
 logger = get_logger("opsi-deploy-client-agent")
 
 
-def get_target_os():
+def get_target_os() -> str:
 	product_id = get_product_id()
 	if product_id == "opsi-client-agent":
 		return "windows"
@@ -52,7 +52,7 @@ def get_target_os():
 	raise ValueError(f"Unknown product_id {product_id} cannot match os")
 
 
-def parse_args(target_os):
+def parse_args(target_os: str) -> argparse.Namespace:
 	script_description = "Deploy opsi client agent to the specified clients."
 	if target_os in ("linux", "macos"):
 		script_description = "\n".join(
@@ -192,7 +192,7 @@ def parse_args(target_os):
 	return args
 
 
-def main():
+def main() -> None:
 	target_os = get_target_os()
 	args = parse_args(target_os)
 

@@ -18,7 +18,7 @@ import threading
 import subprocess
 
 from opsicommon.client.opsiservice import ServiceClient
-from opsicommon.objects import OpsiClient, ProductOnClient
+from opsicommon.objects import OpsiClient, ProductOnClient, OpsiConfigserver, OpsiDepotserver
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import get_logger, secret_filter, log_context
 from opsicommon.utils import monkeypatch_subprocess_for_frozen
@@ -108,20 +108,20 @@ class FiletransferUnsuccessful(Exception):
 class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self,
-		host,
-		backend,
-		username,
-		password,
-		finalize_action="start_service",
-		deployment_method="auto",
-		stop_on_ping_failure=True,
-		skip_existing_client=False,
-		keep_client_on_failure=False,
-		additional_client_settings=None,
-		depot=None,
-		group=None,
-		install_timeout=None,
-	):
+		host: str,
+		backend: ServiceClient,
+		username: str,
+		password: str,
+		finalize_action: str = "start_service",
+		deployment_method: str = "auto",
+		stop_on_ping_failure: bool = True,
+		skip_existing_client: bool = False,
+		keep_client_on_failure: bool = False,
+		additional_client_settings: dict[str, str] | None = None,
+		depot: str | None = None,
+		group: str | None = None,
+		install_timeout: int | None = None,
+	) -> None:
 		threading.Thread.__init__(self)
 
 		self.result = "noattempt"
@@ -197,7 +197,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if hosts and self.skip_existing_client:
 			raise SkipClientException(f"Client {self.host} exists.")
 
-		if hosts[0]["type"] in ("OpsiConfigserver", "OpsiDepotserver"):
+		if isinstance(hosts[0], (OpsiConfigserver, OpsiDepotserver)):
 			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", self.host)
 			raise SkipClientException(f"Not deploying to server {self.host}.")
 
@@ -376,7 +376,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self._assign_client_to_depot()
 
 		self.host_object = self.backend.jsonrpc("host_getObjects", [[], {"type": "OpsiClient", "id": self.host}])[0]
-		secret_filter.add_secrets(self.host_object["opsiHostKey"])
+		secret_filter.add_secrets(self.host_object.opsiHostKey)
 
 	def run(self):
 		with log_context({"client": self.host}):

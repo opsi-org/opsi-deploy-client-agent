@@ -322,13 +322,13 @@ class WindowsDeployThread(DeployThread):
 			rf"{folder}\oca-installation-helper.exe"
 			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
 			f" --log-level debug"
-			f" --service-address {self._get_service_address(self.host_object['id'])}"
-			f" --service-username {self.host_object['id']}"
-			f" --service-password {self.host_object['opsiHostKey']}"
-			f" --client-id {self.host_object['id']}"
+			f" --service-address {self._get_service_address(self.host_object.id)}"
+			f" --service-username {self.host_object.id}"
+			f" --service-password {self.host_object.opsiHostKey}"
+			f" --client-id {self.host_object.id}"
 			" --no-gui --non-interactive"
 		)
-		self._set_client_agent_to_installing(self.host_object["id"], self.product_id)
+		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		try:
 			self.tsch_exec(install_command, timeout=self.install_timeout)

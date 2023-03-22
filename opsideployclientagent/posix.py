@@ -99,10 +99,10 @@ class PosixDeployThread(DeployThread):
 
 		install_command = (
 			f"{self.remote_folder}/oca-installation-helper"
-			f" --service-address {self._get_service_address(self.host_object['id'])}"
-			f" --service-username {self.host_object['id']}"
-			f" --service-password {self.host_object['opsiHostKey']}"
-			f" --client-id {self.host_object['id']}"
+			f" --service-address {self._get_service_address(self.host_object.id)}"
+			f" --service-username {self.host_object.id}"
+			f" --service-password {self.host_object.opsiHostKey}"
+			f" --client-id {self.host_object.id}"
 			f" --no-gui --non-interactive"
 		)
 		if self.username != "root":
@@ -114,7 +114,7 @@ class PosixDeployThread(DeployThread):
 			self._execute_via_ssh(f'echo "\n" >> {credentialsfile}')
 			self.credentialsfile = credentialsfile
 
-		self._set_client_agent_to_installing(self.host_object["id"], self.product_id)
+		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
 		logger.notice("Running installation script...")
 		logger.info("Executing %s", install_command)
 		self._execute_via_ssh(install_command, timeout=self.install_timeout)

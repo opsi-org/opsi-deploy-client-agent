@@ -22,6 +22,7 @@ from opsicommon.logging import get_logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
 from opsicommon.client.opsiservice import get_service_client
 
+from opsideployclientagent.common import DeployThread
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
@@ -42,7 +43,7 @@ def write_failed_clients(clients: dict[str, str], failed_clients_file: Path) -> 
 			fcfile.write(f"{client}\t{reason}\n")
 
 
-def get_password(password: str) -> str:
+def get_password(password: str | None) -> str:
 	if not password:
 		print("Password is required for deployment.")
 		password = forceUnicode(getpass.getpass())
@@ -58,22 +59,22 @@ def get_password(password: str) -> str:
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
-	hosts,
-	target_os,
-	host_file=None,
-	password=None,
-	max_threads=1,
-	deployment_method="auto",
-	depot=None,
-	group=None,
-	finalize_action="start_service",
-	username=None,
-	stop_on_ping_failure=False,
-	skip_existing_client=False,
-	keep_client_on_failure=True,
-	ssh_hostkey_policy=None,
-	install_timeout=None,
-	failed_clients_file=None,
+	hosts: list[str],
+	target_os: str,
+	host_file: str | None = None,
+	password: str | None = None,
+	max_threads: int = 1,
+	deployment_method: str = "auto",
+	depot: str | None = None,
+	group: str | None = None,
+	finalize_action: str = "start_service",
+	username: str | None = None,
+	stop_on_ping_failure: bool = False,
+	skip_existing_client: bool = False,
+	keep_client_on_failure: bool = True,
+	ssh_hostkey_policy: paramiko.MissingHostKeyPolicy | None = None,
+	install_timeout: int | None = None,
+	failed_clients_file: Path | None = None,
 ):
 
 	if username is None:
@@ -108,9 +109,9 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")
-		DeploymentClass = WindowsDeployThread
+		DeploymentClass: DeployThread = WindowsDeployThread
 	else:
-		DeploymentClass = PosixDeployThread
+		DeploymentClass: DeployThread = PosixDeployThread
 
 	if target_os == "linux":
 		logger.info("Deploying to Linux.")
@@ -129,9 +130,9 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	total = 0
 	success = 0
 	skips = 0
-	failed_clients = {}
+	failed_clients: dict[str, str] = {}
 
-	running_threads = []
+	running_threads: list[DeployThread] = []
 
 	while hosts or running_threads:
 		try:
