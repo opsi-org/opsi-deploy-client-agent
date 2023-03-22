@@ -51,7 +51,7 @@ def get_password(password: str) -> str:
 
 	for character in ("$", "§"):
 		if character in password:
-			logger.warning("Please be aware that special characters in passwords may result " "in incorrect behaviour.")
+			logger.warning("Please be aware that special characters in passwords may result in incorrect behaviour.")
 			break
 	secret_filter.add_secrets(password)
 	return password
