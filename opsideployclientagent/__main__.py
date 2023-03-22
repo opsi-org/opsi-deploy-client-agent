@@ -31,12 +31,14 @@ import argparse
 from pathlib import Path
 import paramiko  # type: ignore[import]
 
-from opsicommon import __version__ as python_opsi_common_version  # type: ignore[import]
-from opsicommon.logging import logging_config, logger  # type: ignore[import]
-from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG  # type: ignore[import]
+from opsicommon import __version__ as python_opsi_common_version
+from opsicommon.logging import logging_config, get_logger
+from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG
 
 from opsideployclientagent import deploy_client_agent, __version__
 from opsideployclientagent.common import get_product_id
+
+logger = get_logger("opsi-deploy-client-agent")
 
 
 def get_target_os():

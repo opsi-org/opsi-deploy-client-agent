@@ -15,9 +15,11 @@ import re
 from contextlib import closing, contextmanager
 import paramiko  # type: ignore[import]
 
-from opsicommon.logging import logger  # type: ignore[import]
+from opsicommon.logging import get_logger
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
+
+logger = get_logger("opsi-deploy-client-agent")
 
 
 class SSHRemoteExecutionException(Exception):
@@ -76,12 +78,14 @@ class PosixDeployThread(DeployThread):
 		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")  # clean up previous run
 		logger.notice("Copying installation scripts...")
 		try:
-			self._copy_over_ssh(os.path.join(local_folder, 'files'), self.remote_folder)
-			if not os.path.exists(os.path.join(local_folder, 'custom')):
-				os.makedirs(os.path.join(local_folder, 'custom'))
-			self._copy_over_ssh(os.path.join(local_folder, 'custom'), self.remote_folder)
-			self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(self.remote_folder, 'setup.opsiscript'))
-			self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(self.remote_folder, 'oca-installation-helper'))
+			self._copy_over_ssh(os.path.join(local_folder, "files"), self.remote_folder)
+			if not os.path.exists(os.path.join(local_folder, "custom")):
+				os.makedirs(os.path.join(local_folder, "custom"))
+			self._copy_over_ssh(os.path.join(local_folder, "custom"), self.remote_folder)
+			self._copy_over_ssh(os.path.join(local_folder, "setup.opsiscript"), os.path.join(self.remote_folder, "setup.opsiscript"))
+			self._copy_over_ssh(
+				os.path.join(local_folder, "oca-installation-helper"), os.path.join(self.remote_folder, "oca-installation-helper")
+			)
 		except Exception as error:
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
@@ -95,10 +99,10 @@ class PosixDeployThread(DeployThread):
 
 		install_command = (
 			f"{self.remote_folder}/oca-installation-helper"
-			f" --service-address {self._get_service_address(self.host_object.id)}"
-			f" --service-username {self.host_object.id}"
-			f" --service-password {self.host_object.opsiHostKey}"
-			f" --client-id {self.host_object.id}"
+			f" --service-address {self._get_service_address(self.host_object['id'])}"
+			f" --service-username {self.host_object['id']}"
+			f" --service-password {self.host_object['opsiHostKey']}"
+			f" --client-id {self.host_object['id']}"
 			f" --no-gui --non-interactive"
 		)
 		if self.username != "root":
@@ -110,7 +114,7 @@ class PosixDeployThread(DeployThread):
 			self._execute_via_ssh(f'echo "\n" >> {credentialsfile}')
 			self.credentialsfile = credentialsfile
 
-		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
+		self._set_client_agent_to_installing(self.host_object["id"], self.product_id)
 		logger.notice("Running installation script...")
 		logger.info("Executing %s", install_command)
 		self._execute_via_ssh(install_command, timeout=self.install_timeout)

@@ -22,12 +22,13 @@ from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
-from opsicommon.logging import logger  # type: ignore[import]
-from opsicommon.types import forceUnicode  # type: ignore[import]
-from smbclient import delete_session, register_session  # type: ignore[import]
-from smbclient import shutil as smbshutil  # type: ignore[import]
+from opsicommon.logging import get_logger
+from opsicommon.types import forceUnicode
+import smbclient  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful, execute
+
+logger = get_logger("opsi-deploy-client-agent")
 
 PROCESS_CHECK_INTERVAL = 5  # seconds
 PROCESS_MAX_TIMEOUT = 3600
@@ -285,32 +286,32 @@ class WindowsDeployThread(DeployThread):
 		def copy_dir(src_dir, dst_dir):
 			"""Copy src_dir into dst_dir"""
 			dst_dir = ntpath.join(dst_dir, os.path.basename(src_dir))
-			smbshutil.makedirs(dst_dir)
+			smbclient.shutil.makedirs(dst_dir)
 			for root, dirs, files in os.walk(src_dir):
 				path = os.path.relpath(root, src_dir)
 				nt_path = path.replace(os.sep, ntpath.sep)
 				for dirname in dirs:
 					dst = ntpath.join(dst_dir, nt_path, dirname)
-					smbshutil.makedirs(dst)
+					smbclient.shutil.makedirs(dst)
 				for filename in files:
 					src = os.path.join(root, filename)
 					dst = ntpath.join(dst_dir, nt_path, filename)
-					smbshutil.copy2(src, dst)
+					smbclient.shutil.copy2(src, dst)
 
 		try:
-			register_session(server=self.network_address, username=self.username, password=self.password)
+			smbclient.register_session(server=self.network_address, username=self.username, password=self.password)
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
-			smbshutil.makedirs(log_folder, exist_ok=True)
-			smbshutil.makedirs(self.remote_folder)
+			smbclient.shutil.makedirs(log_folder, exist_ok=True)
+			smbclient.shutil.makedirs(self.remote_folder)
 			copy_dir("files", self.remote_folder)
-			smbshutil.copy2("setup.opsiscript", self.remote_folder)
-			smbshutil.copy2("oca-installation-helper.exe", self.remote_folder)
+			smbclient.shutil.copy2("setup.opsiscript", self.remote_folder)
+			smbclient.shutil.copy2("oca-installation-helper.exe", self.remote_folder)
 		except Exception as error:  # pylint: disable=broad-except
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 		finally:
 			try:
-				delete_session(server=self.network_address)
+				smbclient.delete_session(server=self.network_address)
 			except Exception:  # pylint: disable=broad-except
 				pass
 
@@ -321,13 +322,13 @@ class WindowsDeployThread(DeployThread):
 			rf"{folder}\oca-installation-helper.exe"
 			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
 			f" --log-level debug"
-			f" --service-address {self._get_service_address(self.host_object.id)}"
-			f" --service-username {self.host_object.id}"
-			f" --service-password {self.host_object.opsiHostKey}"
-			f" --client-id {self.host_object.id}"
+			f" --service-address {self._get_service_address(self.host_object['id'])}"
+			f" --service-username {self.host_object['id']}"
+			f" --service-password {self.host_object['opsiHostKey']}"
+			f" --client-id {self.host_object['id']}"
 			" --no-gui --non-interactive"
 		)
-		self._set_client_agent_to_installing(self.host_object.id, self.product_id)
+		self._set_client_agent_to_installing(self.host_object["id"], self.product_id)
 		logger.notice("Running installation script...")
 		try:
 			self.tsch_exec(install_command, timeout=self.install_timeout)
@@ -360,10 +361,10 @@ class WindowsDeployThread(DeployThread):
 		)
 
 	def cleanup_files_smbprotocol(self):
-		register_session(server=self.network_address, username=self.username, password=self.password)
-		if smbshutil.isdir(self.remote_folder):
+		smbclient.register_session(server=self.network_address, username=self.username, password=self.password)
+		if smbclient.shutil.isdir(self.remote_folder):
 			logger.info("Deleting remote folder: %s", self.remote_folder)
-			smbshutil.rmtree(self.remote_folder)
+			smbclient.shutil.rmtree(self.remote_folder)
 
 	def cleanup(self):
 		logger.notice("Cleaning up")
@@ -380,7 +381,7 @@ class WindowsDeployThread(DeployThread):
 			logger.error("Cleanup failed: %s", err)
 		finally:
 			try:
-				delete_session(server=self.network_address)
+				smbclient.delete_session(server=self.network_address)
 			except Exception:  # pylint: disable=broad-except
 				pass
 

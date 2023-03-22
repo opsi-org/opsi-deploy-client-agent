@@ -10,26 +10,25 @@ that are already running an operating system that has not been
 installed via opsi.
 """
 
-__version__ = '4.2.0.22'
+__version__ = "4.2.0.24"
 
 
 import getpass
-import os
-from typing import Dict
 import time
 from pathlib import Path
 import paramiko  # type: ignore[import]
 
-from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
-from opsicommon.logging import logger, secret_filter  # type: ignore[import]
-from opsicommon.types import forceUnicode, forceUnicodeLower  # type: ignore[import]
+from opsicommon.logging import get_logger, secret_filter
+from opsicommon.types import forceUnicode, forceUnicodeLower
+from opsicommon.client.opsiservice import get_service_client
 
-from opsideployclientagent.common import execute
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
+logger = get_logger("opsi-deploy-client-agent")
 
-def write_failed_clients(clients: Dict[str, str], failed_clients_file: Path) -> None:
+
+def write_failed_clients(clients: dict[str, str], failed_clients_file: Path) -> None:
 	if failed_clients_file.name == "console":
 		for client, reason in clients.items():
 			print(f"{client}\t{reason}")
@@ -50,24 +49,31 @@ def get_password(password: str) -> str:
 		if not password:
 			raise ValueError("No password given.")
 
-	for character in ('$', '§'):
+	for character in ("$", "§"):
 		if character in password:
-			logger.warning(
-				"Please be aware that special characters in passwords may result "
-				"in incorrect behaviour."
-			)
+			logger.warning("Please be aware that special characters in passwords may result " "in incorrect behaviour.")
 			break
 	secret_filter.add_secrets(password)
 	return password
 
 
 def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
-	hosts, target_os, host_file=None, password=None, max_threads=1,
-	deployment_method="auto", depot=None, group=None,
-	finalize_action="start_service", username=None,
-	stop_on_ping_failure=False, skip_existing_client=False,
-	keep_client_on_failure=True, ssh_hostkey_policy=None,
-	install_timeout=None, failed_clients_file=None
+	hosts,
+	target_os,
+	host_file=None,
+	password=None,
+	max_threads=1,
+	deployment_method="auto",
+	depot=None,
+	group=None,
+	finalize_action="start_service",
+	username=None,
+	stop_on_ping_failure=False,
+	skip_existing_client=False,
+	keep_client_on_failure=True,
+	ssh_hostkey_policy=None,
+	install_timeout=None,
+	failed_clients_file=None,
 ):
 
 	if username is None:
@@ -81,7 +87,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		with open(host_file, encoding="utf-8") as input_file:
 			for line in input_file:
 				line = line.strip()
-				if not line or line.startswith('#') or line.startswith(';'):
+				if not line or line.startswith("#") or line.startswith(";"):
 					continue
 
 				try:
@@ -95,7 +101,7 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	if not hosts:
 		raise ValueError("No hosts given.")
 
-	logger.debug('Deploying to the following hosts: %s', hosts)
+	logger.debug("Deploying to the following hosts: %s", hosts)
 
 	password = get_password(password)
 	max_threads = int(max_threads)
@@ -111,20 +117,13 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	elif target_os == "macos":
 		logger.info("Deploying to MacOS.")
 
-	# Create BackendManager
-	backend = BackendManager(
-		dispatchConfigFile='/etc/opsi/backendManager/dispatch.conf',
-		backendConfigDir='/etc/opsi/backends',
-		extend=True,
-		depotbackend=False,
-		hostControlBackend=False
-	)
+	backend = get_service_client()
 
 	if depot:
-		assert backend.config_getObjects(id='clientconfig.depot.id')  # pylint: disable=no-member
-		if not backend.host_getObjects(type=['OpsiConfigserver', 'OpsiDepotserver'], id=depot):  # pylint: disable=no-member
+		assert backend.jsonrpc("config_getObjects", [[], {"id": "clientconfig.depot.id"}])
+		if not backend.jsonrpc("host_getObjects", [[], {"type": ["OpsiConfigserver", "OpsiDepotserver"], "id": depot}]):
 			raise ValueError(f"No depot with id {depot} found")
-	if group and not backend.group_getObjects(id=group):  # pylint: disable=no-member
+	if group and not backend.jsonrpc("group_getObjects", [[], {"id": group}]):
 		raise ValueError(f"Group {group} does not exist")
 
 	total = 0
@@ -152,11 +151,11 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 					"keep_client_on_failure": keep_client_on_failure,
 					"depot": depot,
 					"group": group,
-					"install_timeout": install_timeout
+					"install_timeout": install_timeout,
 				}
 
 				try:
-					client_config['additional_client_settings'] = additional_host_infos[host]
+					client_config["additional_client_settings"] = additional_host_infos[host]
 				except KeyError:
 					pass
 
