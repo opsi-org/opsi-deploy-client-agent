@@ -15,9 +15,11 @@ import re
 from contextlib import closing, contextmanager
 import paramiko  # type: ignore[import]
 
-from opsicommon.logging import logger  # type: ignore[import]
+from opsicommon.logging import get_logger
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
+
+logger = get_logger("opsi-deploy-client-agent")
 
 
 class SSHRemoteExecutionException(Exception):
@@ -28,7 +30,6 @@ class PosixDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self,
 		host,
-		backend,
 		username,
 		password,
 		target_os,
@@ -47,7 +48,6 @@ class PosixDeployThread(DeployThread):
 		DeployThread.__init__(
 			self,
 			host,
-			backend,
 			username,
 			password,
 			finalize_action,
@@ -66,7 +66,7 @@ class PosixDeployThread(DeployThread):
 		self._ssh_policy = ssh_policy
 		self.credentialsfile = None
 
-	def copy_data(self):
+	def copy_data(self) -> None:
 		self.remote_folder = os.path.join("/tmp", "opsi-client-agent")
 		if getattr(sys, "frozen", False):
 			local_folder = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
@@ -76,22 +76,26 @@ class PosixDeployThread(DeployThread):
 		self._execute_via_ssh("rm -rf /tmp/opsi-client-agent")  # clean up previous run
 		logger.notice("Copying installation scripts...")
 		try:
-			self._copy_over_ssh(os.path.join(local_folder, 'files'), self.remote_folder)
-			if not os.path.exists(os.path.join(local_folder, 'custom')):
-				os.makedirs(os.path.join(local_folder, 'custom'))
-			self._copy_over_ssh(os.path.join(local_folder, 'custom'), self.remote_folder)
-			self._copy_over_ssh(os.path.join(local_folder, 'setup.opsiscript'), os.path.join(self.remote_folder, 'setup.opsiscript'))
-			self._copy_over_ssh(os.path.join(local_folder, 'oca-installation-helper'), os.path.join(self.remote_folder, 'oca-installation-helper'))
+			self._copy_over_ssh(os.path.join(local_folder, "files"), self.remote_folder)
+			if not os.path.exists(os.path.join(local_folder, "custom")):
+				os.makedirs(os.path.join(local_folder, "custom"))
+			self._copy_over_ssh(os.path.join(local_folder, "custom"), self.remote_folder)
+			self._copy_over_ssh(os.path.join(local_folder, "setup.opsiscript"), os.path.join(self.remote_folder, "setup.opsiscript"))
+			self._copy_over_ssh(
+				os.path.join(local_folder, "oca-installation-helper"), os.path.join(self.remote_folder, "oca-installation-helper")
+			)
 		except Exception as error:
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 
-	def run_installation(self):
+	def run_installation(self) -> None:
 		if self.target_os == "linux":
 			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script/opsi-*")
 		elif self.target_os == "macos":
 			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script.app/Contents/MacOS/opsi-*")
 		self._execute_via_ssh(f"chmod +x {self.remote_folder}/oca-installation-helper")
+		if not self.host_object:
+			raise ValueError("No valid host object found.")
 
 		install_command = (
 			f"{self.remote_folder}/oca-installation-helper"
@@ -115,7 +119,7 @@ class PosixDeployThread(DeployThread):
 		logger.info("Executing %s", install_command)
 		self._execute_via_ssh(install_command, timeout=self.install_timeout)
 
-	def finalize(self):
+	def finalize(self) -> None:
 		# remove credentialsfile in 1min time window between call and execution of reboot/shutdown
 		cmd = ""
 		# TODO: shutdown blocks on macos until it is concluded -> error
@@ -134,7 +138,7 @@ class PosixDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-	def cleanup(self):
+	def cleanup(self) -> None:
 		try:
 			if self.remote_folder:
 				# remote_folder includes credentialsfile if any
@@ -149,7 +153,7 @@ class PosixDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.trace("Closing SSH connection failed: %s", err)
 
-	def ask_host_for_hostname(self, host):
+	def ask_host_for_hostname(self, host: str) -> str:
 		if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host):
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(self._ssh_policy())
@@ -161,7 +165,7 @@ class PosixDeployThread(DeployThread):
 			return host_id
 		raise ValueError(f"invalid host {host}")
 
-	def _execute_via_ssh(self, command, timeout=None):
+	def _execute_via_ssh(self, command: str, timeout: int | None = None) -> str:
 		"""
 		Executing a command via SSH.
 
@@ -192,7 +196,7 @@ class PosixDeployThread(DeployThread):
 			raise SSHRemoteExecutionException(f"Executing {command} on remote client failed! Got exit code {exit_code}")
 		return out
 
-	def _connect_via_ssh(self):
+	def _connect_via_ssh(self) -> None:
 		if self._ssh_connection is not None:
 			return
 
@@ -201,9 +205,13 @@ class PosixDeployThread(DeployThread):
 		self._ssh_connection.set_missing_host_key_policy(self._ssh_policy())
 
 		logger.debug("Connecting via SSH...")
-		self._ssh_connection.connect(hostname=self.network_address, username=self.username, password=self.password)
+		self._ssh_connection.connect(
+			hostname=self.network_address,
+			username=self.username,
+			password=self.password,
+		)
 
-	def _copy_over_ssh(self, local_path, remote_path):
+	def _copy_over_ssh(self, local_path: str, remote_path: str) -> None:
 		@contextmanager
 		def change_directory(path):
 			current_dir = os.getcwd()
