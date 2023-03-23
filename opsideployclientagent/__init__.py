@@ -16,12 +16,11 @@ __version__ = "4.3.0.0"
 import getpass
 import time
 from pathlib import Path
-import paramiko  # type: ignore[import]
 
+import paramiko  # type: ignore[import]
 from opsicommon.logging import get_logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
-
-from opsideployclientagent.common import DeployThread, call_backend_method, backend_disconnect
+from opsideployclientagent.common import DeployThread, backend_disconnect, get_backend
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
 
@@ -116,10 +115,10 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 		logger.info("Deploying to MacOS.")
 
 	if depot:
-		assert call_backend_method("config_getObjects", [[], {"id": "clientconfig.depot.id"}])
-		if not call_backend_method("host_getObjects", [[], {"type": ["OpsiConfigserver", "OpsiDepotserver"], "id": depot}]):
+		assert get_backend().config_getObjects(id="clientconfig.depot.id")  # type: ignore  # pylint: disable=no-member
+		if not get_backend().host_getObjects(type=["OpsiConfigserver", "OpsiDepotserver"], id=depot):  # type: ignore  # pylint: disable=no-member
 			raise ValueError(f"No depot with id {depot} found")
-	if group and not call_backend_method("group_getObjects", [[], {"id": group}]):
+	if group and not get_backend().group_getObjects(id=group):  # type: ignore  # pylint: disable=no-member
 		raise ValueError(f"Group {group} does not exist")
 
 	total = 0

@@ -20,6 +20,7 @@ python-opsi-common = ">=4.3,<4.4"
 paramiko = "^2.9"
 impacket = "^0.10"
 smbprotocol = "^1.9"
+python-opsi = "^4.3.0.11"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.0"

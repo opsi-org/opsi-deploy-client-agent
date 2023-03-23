@@ -4,6 +4,8 @@ pyinstaller-poetry:
   hidden_imports:
     all:
       - paramiko
+      - OPSI.Backend.File
+      - OPSI.Backend.MySQL
   extra_args:
     darwin:
       - --exclude-module

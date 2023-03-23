@@ -9,20 +9,25 @@ common deployment module
 This module contains the class DeployThread and related methods.
 """
 
-import re
 import os
-import sys
-import time
+import re
 import socket
-import threading
 import subprocess
-from typing import Any
+import sys
+import threading
+import time
 
-from opsicommon.objects import OpsiClient, ProductOnClient, OpsiConfigserver, OpsiDepotserver
-from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
-from opsicommon.logging import get_logger, secret_filter, log_context
+from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
+from opsicommon.client.opsiservice import ServiceClient, get_service_client
+from opsicommon.logging import get_logger, log_context, secret_filter
+from opsicommon.objects import (
+	OpsiClient,
+	OpsiConfigserver,
+	OpsiDepotserver,
+	ProductOnClient,
+)
+from opsicommon.types import forceHostId, forceIPAddress, forceUnicodeLower
 from opsicommon.utils import monkeypatch_subprocess_for_frozen
-from opsicommon.client.opsiservice import get_service_client
 
 logger = get_logger("opsi-deploy-client-agent")
 monkeypatch_subprocess_for_frozen()
@@ -30,20 +35,25 @@ monkeypatch_subprocess_for_frozen()
 backend = None  # pylint: disable=invalid-name
 
 
-def call_backend_method(method: str, params: list[Any]) -> Any:
+def get_backend() -> BackendManager | ServiceClient:
 	global backend  # pylint: disable=global-statement
 	if not backend:
 		try:
 			backend = get_service_client()
 		except Exception:  # pylint: disable=broad-except
-			logger.error("Failed to get backend connection. Only works on >= 4.3 server")
-			logger.notice("On 4.2 servers use opsi-deploy-client-agent-4.2")
-			sys.exit(1)
-	return backend.jsonrpc(method, params)
+			backend = BackendManager(
+				dispatchConfigFile="/etc/opsi/backendManager/dispatch.conf",
+				dispatchIgnoreModules=["OpsiPXEConfd", "DHCPD"],
+				backendConfigDir="/etc/opsi/backends",
+				extend=True,
+				depotbackend=False,
+				hostControlBackend=False,
+			)
+	return backend
 
 
 def backend_disconnect() -> None:
-	if backend:
+	if backend and isinstance(backend, ServiceClient):
 		backend.disconnect()
 
 
@@ -209,7 +219,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			raise ValueError(f"invalid host {host}")
 
 	def _check_if_client_should_be_skipped(self) -> None:
-		hosts = call_backend_method("host_getObjects", [[], {"id": self.host}])
+		hosts = get_backend().host_getObjects(id=self.host)  # type: ignore  # pylint: disable=no-member
 		if hosts and self.skip_existing_client:
 			raise SkipClientException(f"Client {self.host} exists.")
 
@@ -261,7 +271,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.warning("No ping response received from %s", ip_address)
 
 	def _create_host_if_not_existing(self, ip_address: str) -> None:
-		if not call_backend_method("host_getIdents", [[], {"type": "OpsiClient", "id": self.host}]):
+		if not get_backend().host_getIdents(type="OpsiClient", id=self.host):  # type: ignore  # pylint: disable=no-member
 			logger.notice("Getting hardware ethernet address of host %s", self.host)
 			mac = self._get_mac_address(ip_address)
 			if not mac:
@@ -279,7 +289,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 				logger.debug("Updated config now is: %s", client_config)
 
 			logger.notice("Creating client %s", self.host)
-			call_backend_method("host_createObjects", [OpsiClient(**client_config)])  # type: ignore
+			get_backend().host_createObjects([OpsiClient(**client_config)])  # type: ignore  # pylint: disable=no-member  # type: ignore
 			self._client_created_by_script = True
 
 	def _put_client_into_group(self) -> None:
@@ -293,7 +303,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			"objectId": self.host,
 		}
 		try:
-			call_backend_method("objectToGroup_createObjects", [mapping])
+			get_backend().objectToGroup_createObjects([mapping])  # type: ignore  # pylint: disable=no-member
 			logger.notice("Added %s to group %s", self.host, self.group)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Adding %s to group %s failed: %s", self.host, self.group, err)
@@ -309,7 +319,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			"type": "ConfigState",
 		}
 		try:
-			call_backend_method("configState_createObjects", [depot_assignment])
+			get_backend().configState_createObjects([depot_assignment])  # type: ignore  # pylint: disable=no-member
 			logger.notice("Assigned %s to depot %s", self.host, self.depot)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Assgining %s to depot %s failed: %s", self.host, self.depot, err)
@@ -356,28 +366,30 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			actionRequest="none",
 			actionProgress="installing",
 		)
-		call_backend_method("productOnClient_updateObjects", [poc])
+		get_backend().productOnClient_updateObjects([poc])  # type: ignore  # pylint: disable=no-member
 
 	def _remove_host_from_backend(self) -> None:
 		try:
 			logger.notice("Deleting client %s from backend", self.host)
-			call_backend_method("host_deleteObjects", [self.host])
+			get_backend().host_deleteObjects([self.host])  # type: ignore  # pylint: disable=no-member
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error(err)
 
 	def _get_service_address(self, host_id: str) -> str:
-		service_configstate = call_backend_method(
-			"configState_getObjects", [[], {"configId": "clientconfig.configserver.url", "objectId": host_id}]
+		service_configstate = get_backend().configState_getObjects(  # type: ignore  # pylint: disable=no-member
+			configId="clientconfig.configserver.url", objectId=host_id
 		)
 		if len(service_configstate) == 1 and len(service_configstate[0].values) >= 1:
 			return service_configstate[0].values[0]
-		service_config = call_backend_method("config_getObjects", [[], {"id": "clientconfig.configserver.url"}])
+		service_config = get_backend().config_getObjects(id="clientconfig.configserver.url")  # type: ignore  # pylint: disable=no-member
 		if len(service_config) == 1 and len(service_config[0].defaultValues) >= 1:
 			return service_config[0].defaultValues[0]
 		raise ValueError("Could not determine associated configservice url")
 
 	def evaluate_success(self) -> None:
-		product_on_client = call_backend_method("productOnClient_getObjects", [[], {"productId": self.product_id, "clientId": self.host}])
+		product_on_client = get_backend().productOnClient_getObjects(  # type: ignore  # pylint: disable=no-member
+			productId=self.product_id, clientId=self.host
+		)
 		if not product_on_client or not product_on_client[0]:
 			raise ProductNotFound(f"Product {self.product_id} not found on client {self.host}")
 		if not product_on_client[0].installationStatus == "installed":
@@ -395,7 +407,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self._put_client_into_group()
 		self._assign_client_to_depot()
 
-		self.host_object = call_backend_method("host_getObjects", [[], {"type": "OpsiClient", "id": self.host}])[0]
+		self.host_object = get_backend().host_getObjects(type="OpsiClient", id=self.host)[0]  # type: ignore  # pylint: disable=no-member
 		if not self.host_object:
 			raise ValueError("No host object found.")
 		secret_filter.add_secrets(self.host_object.opsiHostKey)
