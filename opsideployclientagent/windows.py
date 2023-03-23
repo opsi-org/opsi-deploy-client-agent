@@ -15,7 +15,9 @@ import os
 import re
 import shutil
 import time
+import warnings
 from contextlib import contextmanager
+from typing import Any
 
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
@@ -39,7 +41,7 @@ for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
 
 
-def get_process(i_wbem_services, handle):
+def get_process(i_wbem_services: Any, handle: str) -> Any:
 	try:
 		i_enum_wbem_class_object = i_wbem_services.ExecQuery(f"SELECT * from Win32_Process where handle = {handle}")
 		process_object = i_enum_wbem_class_object.Next(0xFFFFFFFF, 1)[0]
@@ -51,7 +53,7 @@ def get_process(i_wbem_services, handle):
 
 
 @contextmanager
-def dcom_connection(host, username, password):
+def dcom_connection(host: str, username: str, password: str) -> Any:
 	dcom = None
 	domain = ""
 	if "\\" in username:
@@ -71,14 +73,16 @@ def dcom_connection(host, username, password):
 		logger.error("Could not open DCOM connection: %s", error, exc_info=True)
 	finally:
 		if dcom:
-			dcom.disconnect()
+			with warnings.catch_warnings():
+				# dcom.disconnect closes sockets AFTER deleting the corresponding object -> python disapproves
+				warnings.simplefilter("ignore", ResourceWarning)
+				dcom.disconnect()
 
 
 class WindowsDeployThread(DeployThread):
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self,
 		host,
-		backend,
 		username,
 		password,
 		finalize_action="start_service",
@@ -90,11 +94,10 @@ class WindowsDeployThread(DeployThread):
 		depot=None,
 		group=None,
 		install_timeout=None,
-	):
+	) -> None:
 		DeployThread.__init__(
 			self,
 			host,
-			backend,
 			username,
 			password,
 			finalize_action,
@@ -108,10 +111,10 @@ class WindowsDeployThread(DeployThread):
 			install_timeout,
 		)
 
-		self.remote_folder = None
+		self.remote_folder: str | None = None
 		self.smbclient_cmd = shutil.which("smbclient")
 
-	def get_connection_data(self, host):
+	def get_connection_data(self, host: str | None) -> tuple[str, str, str]:
 		host = forceUnicode(host or self.network_address)
 		username = forceUnicode(self.username)
 		password = forceUnicode(self.password)
@@ -121,13 +124,15 @@ class WindowsDeployThread(DeployThread):
 			username = match.group(1) + r"\\" + match.group(2)
 		return host, username, password
 
-	def wmi_exec(self, cmd, host=None, timeout=None):
+	def wmi_exec(self, cmd: str, host: str | None = None, timeout: int | None = None) -> None:
 		# WMI exec requires to logon the given user.
 		# This will fail in a lot of cases.
 		# See https://www.sysadmins.lv/retired-msft-blogs/alejacma/win32processcreate-fails-if-user-profile-is-not-loaded.aspx
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
+		if not host:
+			raise ValueError("No host name given.")
 
 		with dcom_connection(host, username, password) as i_wbem_services:
 			logger.debug("Getting win32_process object.")
@@ -158,14 +163,14 @@ class WindowsDeployThread(DeployThread):
 				logger.error("Process reached timeout, killing process")
 				process_object.Terminate(1)
 
-	def wmi_query(self, query, host=None):
+	def wmi_query(self, query: str, host: str | None = None) -> Any:
 		host, username, password = self.get_connection_data(host)
 		with dcom_connection(host, username, password) as i_wbem_services:
 			query_result = i_wbem_services.ExecQuery(query)
 			logger.notice("Querying '%s' on host '%s'", query, host)
 			return query_result.Next(0xFFFFFFFF, 1)[0]
 
-	def tsch_exec(self, cmd, host=None, timeout=None):  # pylint: disable=too-many-locals
+	def tsch_exec(self, cmd: str, host: str | None = None, timeout: int | None = None) -> None:  # pylint: disable=too-many-locals
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
@@ -255,7 +260,7 @@ class WindowsDeployThread(DeployThread):
 			tsch.hSchRpcDelete(dce, f"\\{task_name}")
 			dce.disconnect()
 
-	def copy_data(self):
+	def copy_data(self) -> None:
 		target_os = self.wmi_query("SELECT * from Win32_OperatingSystem", host=self.network_address)
 		if target_os and hasattr(target_os, "Version"):
 			logger.info("Target os version: %s", target_os.Version)
@@ -265,11 +270,12 @@ class WindowsDeployThread(DeployThread):
 		logger.notice("Copying installation files")
 		if self.smbclient_cmd:
 			logger.info("Using smbclient to copy files")
-			return self.copy_data_smbclient()
+			self.copy_data_smbclient()
+			return
 		logger.info("Using smbprotocol to copy files")
-		return self.copy_data_smbprotocol()
+		self.copy_data_smbprotocol()
 
-	def copy_data_smbclient(self):
+	def copy_data_smbclient(self) -> None:
 		folder_name = f"opsi-deploy-client-agent-{int(time.time())}"
 		self.remote_folder = rf"c:\opsi.org\tmp\{folder_name}"
 		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
@@ -280,10 +286,10 @@ class WindowsDeployThread(DeployThread):
 			f" cd {folder_name}; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
 		)
 
-	def copy_data_smbprotocol(self):
+	def copy_data_smbprotocol(self) -> None:
 		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 
-		def copy_dir(src_dir, dst_dir):
+		def copy_dir(src_dir: str, dst_dir: str) -> None:
 			"""Copy src_dir into dst_dir"""
 			dst_dir = ntpath.join(dst_dir, os.path.basename(src_dir))
 			smbclient.shutil.makedirs(dst_dir)
@@ -315,9 +321,13 @@ class WindowsDeployThread(DeployThread):
 			except Exception:  # pylint: disable=broad-except
 				pass
 
-	def run_installation(self):
+	def run_installation(self) -> None:
+		if not self.remote_folder:
+			raise ValueError("No remote folder given.")
 		folder = re.sub(r".+c\$", r"c:\\", self.remote_folder)
 		logger.info("Deploying from path %s", folder)
+		if not self.host_object:
+			raise ValueError("No valid host object found.")
 		install_command = (
 			rf"{folder}\oca-installation-helper.exe"
 			r" --log-file c:\opsi.org\log\opsi-deploy-client-agent.log"
@@ -336,7 +346,7 @@ class WindowsDeployThread(DeployThread):
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
 
-	def finalize(self):
+	def finalize(self) -> None:
 		cmd = ""
 		if self.finalize_action == "reboot":
 			logger.notice("Rebooting machine %s", self.network_address)
@@ -352,7 +362,7 @@ class WindowsDeployThread(DeployThread):
 			except Exception as err:  # pylint: disable=broad-except
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-	def cleanup_files_smbclient(self):
+	def cleanup_files_smbclient(self) -> None:
 		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
 		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
 		execute(
@@ -360,13 +370,13 @@ class WindowsDeployThread(DeployThread):
 			f" -c 'prompt; recurse; deltree {self.remote_folder}; exit;'"
 		)
 
-	def cleanup_files_smbprotocol(self):
+	def cleanup_files_smbprotocol(self) -> None:
 		smbclient.register_session(server=self.network_address, username=self.username, password=self.password)
 		if smbclient.shutil.isdir(self.remote_folder):
 			logger.info("Deleting remote folder: %s", self.remote_folder)
 			smbclient.shutil.rmtree(self.remote_folder)
 
-	def cleanup(self):
+	def cleanup(self) -> None:
 		logger.notice("Cleaning up")
 		if not self.remote_folder:
 			return
@@ -385,7 +395,7 @@ class WindowsDeployThread(DeployThread):
 			except Exception:  # pylint: disable=broad-except
 				pass
 
-	def ask_host_for_hostname(self, host):
+	def ask_host_for_hostname(self, host: str) -> str:
 		# preferably host should be an ip
 		try:
 			result = self.wmi_query("SELECT * from Win32_ComputerSystem", host=host)

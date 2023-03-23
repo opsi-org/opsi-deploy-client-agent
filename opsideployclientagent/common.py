@@ -16,19 +16,38 @@ import time
 import socket
 import threading
 import subprocess
+from typing import Any
 
-from opsicommon.client.opsiservice import ServiceClient
 from opsicommon.objects import OpsiClient, ProductOnClient, OpsiConfigserver, OpsiDepotserver
 from opsicommon.types import forceIPAddress, forceUnicodeLower, forceHostId
 from opsicommon.logging import get_logger, secret_filter, log_context
 from opsicommon.utils import monkeypatch_subprocess_for_frozen
+from opsicommon.client.opsiservice import get_service_client
 
 logger = get_logger("opsi-deploy-client-agent")
 monkeypatch_subprocess_for_frozen()
 
+backend = None  # pylint: disable=invalid-name
 
-def get_product_id():
-	# return os.path.basename(os.getcwd())
+
+def call_backend_method(method: str, params: list[Any]) -> Any:
+	global backend  # pylint: disable=global-statement
+	if not backend:
+		try:
+			backend = get_service_client()
+		except Exception:  # pylint: disable=broad-except
+			logger.error("Failed to get backend connection. Only works on >= 4.3 server")
+			logger.notice("On 4.2 servers use opsi-deploy-client-agent-4.2")
+			sys.exit(1)
+	return backend.jsonrpc(method, params)
+
+
+def backend_disconnect() -> None:
+	if backend:
+		backend.disconnect()
+
+
+def get_product_id() -> str:
 	if getattr(sys, "frozen", False):
 		workdir = os.path.dirname(os.path.abspath(sys.executable))  # for running as executable
 	else:
@@ -61,7 +80,7 @@ def execute(cmd: str, timeout: int | None = None) -> list[str]:
 	return subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=timeout).decode("utf-8", errors="replace").split("\n")
 
 
-def _get_id_from_hostname(host, host_ip=None):
+def _get_id_from_hostname(host: str, host_ip: str | None = None) -> str:
 	host = host.replace("_", "-")
 
 	if host.count(".") < 2:
@@ -109,7 +128,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
 		self,
 		host: str,
-		backend: ServiceClient,
 		username: str,
 		password: str,
 		finalize_action: str = "start_service",
@@ -126,7 +144,6 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 		self.result = "noattempt"
 
-		self.backend: ServiceClient = backend
 		self.username = username
 		self.password = password
 		self.finalize_action = finalize_action
@@ -141,28 +158,27 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			self.deployment_method = deployment_method
 
 		self.keep_client_on_failure = keep_client_on_failure
-		self._client_created_by_script = None
-		self._network_address = None
+		self._client_created_by_script: bool | None = None
+		self._network_address: str | None = None
 
 		self.additional_client_settings = additional_client_settings
 		self.depot = depot
 		self.group = group
-		self.host = None
+		self.host: str | None = None
 		self.set_host_id(host)
 		self.host_object = None
 		self.install_timeout = install_timeout
-		self.remote_folder = None
+		self.remote_folder: str | None = None
 		self._should_stop = False
 
-	def stop(self):
+	def stop(self) -> None:
 		self._should_stop = True
 
-	def _detect_deployment_method(self, host):
+	def _detect_deployment_method(self, host: str) -> None:
 		if "." not in host:
 			logger.debug("No dots in host. Assuming hostname.")
 			self.deployment_method = "hostname"
 			return
-
 		try:
 			forceIPAddress(host)
 			logger.debug("Valid IP found.")
@@ -171,10 +187,10 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.debug("Not a valid IP. Assuming FQDN.")
 			self.deployment_method = "fqdn"
 
-	def ask_host_for_hostname(self, host):
+	def ask_host_for_hostname(self, host: str) -> str:  # pylint: disable=unused-argument
 		raise NotImplementedError
 
-	def set_host_id(self, host):
+	def set_host_id(self, host: str) -> None:
 		host_ip = None
 		try:
 			if self.deployment_method == "ip":
@@ -192,8 +208,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if not self.host:
 			raise ValueError(f"invalid host {host}")
 
-	def _check_if_client_should_be_skipped(self):
-		hosts = self.backend.jsonrpc("host_getObjects", [[], {"id": self.host}])
+	def _check_if_client_should_be_skipped(self) -> None:
+		hosts = call_backend_method("host_getObjects", [[], {"id": self.host}])
 		if hosts and self.skip_existing_client:
 			raise SkipClientException(f"Client {self.host} exists.")
 
@@ -201,11 +217,13 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", self.host)
 			raise SkipClientException(f"Not deploying to server {self.host}.")
 
-	def _get_ip_address(self, host_name):
+	def _get_ip_address(self, host_name: str) -> str:
 		logger.notice("Querying for ip address of host %s", self.host)
 		ip_address = ""
 		logger.info("Getting host %s by name", self.host)
 		try:
+			if not self.host:
+				raise ValueError("No host name given")
 			ip_address = socket.gethostbyname(self.host)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Failed to get ip address for host %s by syscall: %s", self.host, err)
@@ -226,7 +244,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 
 		return ip_address
 
-	def _ping_client(self, ip_address):
+	def _ping_client(self, ip_address: str) -> None:
 		logger.notice("Pinging host %s ...", ip_address)
 		alive = False
 		try:
@@ -242,8 +260,8 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		else:
 			logger.warning("No ping response received from %s", ip_address)
 
-	def _create_host_if_not_existing(self, ip_address):
-		if not self.backend.jsonrpc("host_getIdents", [[], {"type": "OpsiClient", "id": self.host}]):
+	def _create_host_if_not_existing(self, ip_address: str) -> None:
+		if not call_backend_method("host_getIdents", [[], {"type": "OpsiClient", "id": self.host}]):
 			logger.notice("Getting hardware ethernet address of host %s", self.host)
 			mac = self._get_mac_address(ip_address)
 			if not mac:
@@ -261,10 +279,10 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 				logger.debug("Updated config now is: %s", client_config)
 
 			logger.notice("Creating client %s", self.host)
-			self.backend.jsonrpc("host_createObjects", [OpsiClient(**client_config)])
+			call_backend_method("host_createObjects", [OpsiClient(**client_config)])  # type: ignore
 			self._client_created_by_script = True
 
-	def _put_client_into_group(self):
+	def _put_client_into_group(self) -> None:
 		if not self.group:
 			return
 
@@ -275,12 +293,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			"objectId": self.host,
 		}
 		try:
-			self.backend.jsonrpc("objectToGroup_createObjects", [mapping])
+			call_backend_method("objectToGroup_createObjects", [mapping])
 			logger.notice("Added %s to group %s", self.host, self.group)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Adding %s to group %s failed: %s", self.host, self.group, err)
 
-	def _assign_client_to_depot(self):
+	def _assign_client_to_depot(self) -> None:
 		if not self.depot:
 			return
 
@@ -291,13 +309,13 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			"type": "ConfigState",
 		}
 		try:
-			self.backend.jsonrpc("configState_createObjects", [depot_assignment])
+			call_backend_method("configState_createObjects", [depot_assignment])
 			logger.notice("Assigned %s to depot %s", self.host, self.depot)
 		except Exception as err:  # pylint: disable=broad-except
 			logger.warning("Assgining %s to depot %s failed: %s", self.host, self.depot, err)
 
 	@staticmethod
-	def _get_mac_address(ip_address):
+	def _get_mac_address(ip_address: str) -> str:
 		mac = ""
 		with open("/proc/net/arp", encoding="utf-8") as arptable:
 			for line in arptable:
@@ -316,12 +334,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		return mac
 
 	@property
-	def network_address(self):
+	def network_address(self) -> str:
 		if self._network_address is None:
 			raise ValueError("No network address set!")
 		return self._network_address
 
-	def _set_network_address(self, host_name, ip_address):
+	def _set_network_address(self, host_name: str, ip_address: str) -> None:
 		if self.deployment_method == "hostname":
 			self._network_address = host_name
 		elif self.deployment_method == "fqdn":
@@ -329,7 +347,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		else:
 			self._network_address = ip_address
 
-	def _set_client_agent_to_installing(self, host_id, product_id):
+	def _set_client_agent_to_installing(self, host_id: str, product_id: str) -> None:
 		poc = ProductOnClient(
 			productType="LocalbootProduct",
 			clientId=host_id,
@@ -338,34 +356,36 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			actionRequest="none",
 			actionProgress="installing",
 		)
-		self.backend.jsonrpc("productOnClient_updateObjects", [poc])
+		call_backend_method("productOnClient_updateObjects", [poc])
 
-	def _remove_host_from_backend(self):
+	def _remove_host_from_backend(self) -> None:
 		try:
 			logger.notice("Deleting client %s from backend", self.host)
-			self.backend.jsonrpc("host_deleteObjects", [self.host])
+			call_backend_method("host_deleteObjects", [self.host])
 		except Exception as err:  # pylint: disable=broad-except
 			logger.error(err)
 
-	def _get_service_address(self, host_id):
-		service_configstate = self.backend.jsonrpc(
+	def _get_service_address(self, host_id: str) -> str:
+		service_configstate = call_backend_method(
 			"configState_getObjects", [[], {"configId": "clientconfig.configserver.url", "objectId": host_id}]
 		)
 		if len(service_configstate) == 1 and len(service_configstate[0].values) >= 1:
 			return service_configstate[0].values[0]
-		service_config = self.backend.jsonrpc("config_getObjects", [[], {"id": "clientconfig.configserver.url"}])
+		service_config = call_backend_method("config_getObjects", [[], {"id": "clientconfig.configserver.url"}])
 		if len(service_config) == 1 and len(service_config[0].defaultValues) >= 1:
 			return service_config[0].defaultValues[0]
 		raise ValueError("Could not determine associated configservice url")
 
-	def evaluate_success(self):
-		product_on_client = self.backend.jsonrpc("productOnClient_getObjects", [[], {"productId": self.product_id, "clientId": self.host}])
+	def evaluate_success(self) -> None:
+		product_on_client = call_backend_method("productOnClient_getObjects", [[], {"productId": self.product_id, "clientId": self.host}])
 		if not product_on_client or not product_on_client[0]:
 			raise ProductNotFound(f"Product {self.product_id} not found on client {self.host}")
 		if not product_on_client[0].installationStatus == "installed":
 			raise InstallationUnsuccessful(f"Installation of {self.product_id} on client {self.host} unsuccessful")
 
-	def prepare_deploy(self):
+	def prepare_deploy(self) -> None:
+		if not self.host:
+			raise ValueError("No host name given.")
 		host_name = self.host.split(".")[0]
 		ip_address = self._get_ip_address(host_name)
 		self._ping_client(ip_address)
@@ -375,10 +395,12 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		self._put_client_into_group()
 		self._assign_client_to_depot()
 
-		self.host_object = self.backend.jsonrpc("host_getObjects", [[], {"type": "OpsiClient", "id": self.host}])[0]
+		self.host_object = call_backend_method("host_getObjects", [[], {"type": "OpsiClient", "id": self.host}])[0]
+		if not self.host_object:
+			raise ValueError("No host object found.")
 		secret_filter.add_secrets(self.host_object.opsiHostKey)
 
-	def run(self):
+	def run(self) -> None:
 		with log_context({"client": self.host}):
 			try:
 				logger.debug("Checking if client should be skipped")
@@ -425,14 +447,14 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			finally:
 				self.cleanup()
 
-	def copy_data(self):
+	def copy_data(self) -> None:
 		raise NotImplementedError
 
-	def run_installation(self):  # pylint: disable=unused-argument
+	def run_installation(self) -> None:
 		raise NotImplementedError
 
-	def finalize(self):
+	def finalize(self) -> None:
 		raise NotImplementedError
 
-	def cleanup(self):  # pylint: disable=unused-argument
+	def cleanup(self) -> None:  # pylint: disable=unused-argument
 		raise NotImplementedError
