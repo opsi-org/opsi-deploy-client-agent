@@ -213,7 +213,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		if hosts and self.skip_existing_client:
 			raise SkipClientException(f"Client {self.host} exists.")
 
-		if isinstance(hosts[0], (OpsiConfigserver, OpsiDepotserver)):
+		if hosts and isinstance(hosts[0], (OpsiConfigserver, OpsiDepotserver)):
 			logger.warning("Tried to deploy to existing opsi server %s. Skipping!", self.host)
 			raise SkipClientException(f"Not deploying to server {self.host}.")
 
