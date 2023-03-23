@@ -1,14 +1,17 @@
-image: docker.uib.gmbh/opsi/dev/pybuilder:uib-python-default
+image: docker.uib.gmbh/opsi/dev/pybuilder:uib-python-3.11
 
 stages:
   - test
   - build
+
 
 test:pytest-pylint:
   stage: test
   script:
     - poetry lock --no-update
     - poetry install
+    # Conflicts with smbclient package
+    - rm .venv/bin/smbclient.py || true
     - poetry run pytest -vv
     - poetry run pylint --disable=R,fixme opsideployclientagent
     - poetry run flake8 opsideployclientagent
@@ -18,7 +21,9 @@ build:linux-pyinstaller:
   script:
     - poetry lock --no-update
     - poetry install
-    - poetry run opsi-dev-cli -l info pyinstaller build
+    # Conflicts with smbclient package
+    - rm .venv/bin/smbclient.py || true
+    - poetry run opsi-dev-cli pyinstaller build -l info
     - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent --prerelease="$CI_JOB_ID"'
     - '[ "$CI_COMMIT_TAG" = "" ] || opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent'
