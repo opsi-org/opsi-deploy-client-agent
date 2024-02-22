@@ -27,7 +27,7 @@ class SSHRemoteExecutionException(Exception):
 
 
 class PosixDeployThread(DeployThread):
-	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+	def __init__(
 		self,
 		host,
 		username,
@@ -44,7 +44,6 @@ class PosixDeployThread(DeployThread):
 		ssh_policy=paramiko.WarningPolicy,
 		install_timeout=None,
 	):
-
 		DeployThread.__init__(
 			self,
 			host,
@@ -135,7 +134,7 @@ class PosixDeployThread(DeployThread):
 			try:
 				# finalization is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(cmd, timeout=120)
-			except Exception as err:  # pylint: disable=broad-except
+			except Exception as err:
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup(self) -> None:
@@ -144,13 +143,13 @@ class PosixDeployThread(DeployThread):
 				# remote_folder includes credentialsfile if any
 				# Cleanup is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(f"rm -rf {self.remote_folder}", timeout=120)
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.error("Cleanup failed: %s", err)
 
 		if self._ssh_connection is not None:
 			try:
 				self._ssh_connection.close()
-			except Exception as err:  # pylint: disable=broad-except
+			except Exception as err:
 				logger.trace("Closing SSH connection failed: %s", err)
 
 	def ask_host_for_hostname(self, host: str) -> str:
@@ -222,7 +221,7 @@ class PosixDeployThread(DeployThread):
 		def create_folder_if_missing(path):
 			try:
 				ftp_connection.mkdir(path)
-			except Exception as err:  # pylint: disable=broad-except
+			except Exception as err:
 				logger.debug("Can't create %s on remote: %s", path, err)
 
 		self._connect_via_ssh()

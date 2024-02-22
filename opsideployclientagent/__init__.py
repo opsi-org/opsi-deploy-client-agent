@@ -56,7 +56,7 @@ def get_password(password: str | None) -> str:
 	return password
 
 
-def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements,too-many-branches
+def deploy_client_agent(
 	hosts: list[str],
 	target_os: str,
 	host_file: str | None = None,
@@ -74,7 +74,6 @@ def deploy_client_agent(  # pylint: disable=too-many-arguments,too-many-locals,t
 	install_timeout: int | None = None,
 	failed_clients_file: Path | None = None,
 ) -> int:
-
 	if username is None:
 		if target_os in ("linux", "macos"):
 			username = "root"
