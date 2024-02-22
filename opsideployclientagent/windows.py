@@ -69,7 +69,7 @@ def dcom_connection(host: str, username: str, password: str) -> Any:
 		i_wbem_services = i_wbem_level_1_login.NTLMLogin("//./root/cimv2", NULL, NULL)
 		i_wbem_level_1_login.RemRelease()
 		yield i_wbem_services
-	except Exception as error:  # pylint: disable=broad-except
+	except Exception as error:
 		logger.error("Could not open DCOM connection: %s", error, exc_info=True)
 	finally:
 		if dcom:
@@ -80,7 +80,7 @@ def dcom_connection(host: str, username: str, password: str) -> Any:
 
 
 class WindowsDeployThread(DeployThread):
-	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+	def __init__(
 		self,
 		host,
 		username,
@@ -170,7 +170,7 @@ class WindowsDeployThread(DeployThread):
 			logger.notice("Querying '%s' on host '%s'", query, host)
 			return query_result.Next(0xFFFFFFFF, 1)[0]
 
-	def tsch_exec(self, cmd: str, host: str | None = None, timeout: int | None = None) -> None:  # pylint: disable=too-many-locals
+	def tsch_exec(self, cmd: str, host: str | None = None, timeout: int | None = None) -> None:
 		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
@@ -312,13 +312,13 @@ class WindowsDeployThread(DeployThread):
 			copy_dir("files", self.remote_folder)
 			smbclient.shutil.copy2("setup.opsiscript", self.remote_folder)
 			smbclient.shutil.copy2("oca-installation-helper.exe", self.remote_folder)
-		except Exception as error:  # pylint: disable=broad-except
+		except Exception as error:
 			logger.error("Failed to copy installation files: %s", error, exc_info=True)
 			raise FiletransferUnsuccessful from error
 		finally:
 			try:
 				smbclient.delete_session(server=self.network_address)
-			except Exception:  # pylint: disable=broad-except
+			except Exception:
 				pass
 
 	def run_installation(self) -> None:
@@ -342,7 +342,7 @@ class WindowsDeployThread(DeployThread):
 		logger.notice("Running installation script...")
 		try:
 			self.tsch_exec(install_command, timeout=self.install_timeout)
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.error("Failed to install %s: %s", self.product_id, err)
 			raise
 
@@ -359,7 +359,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				self.tsch_exec(cmd, timeout=30)
-			except Exception as err:  # pylint: disable=broad-except
+			except Exception as err:
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup_files_smbclient(self) -> None:
@@ -387,12 +387,12 @@ class WindowsDeployThread(DeployThread):
 			else:
 				logger.info("Using smbprotocol to cleanup files")
 				self.cleanup_files_smbprotocol()
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.error("Cleanup failed: %s", err)
 		finally:
 			try:
 				smbclient.delete_session(server=self.network_address)
-			except Exception:  # pylint: disable=broad-except
+			except Exception:
 				pass
 
 	def ask_host_for_hostname(self, host: str) -> str:
@@ -403,6 +403,6 @@ class WindowsDeployThread(DeployThread):
 				raise ValueError("Did not get Computer Name")
 			logger.debug("Lookup of IP returned hostname %s", result.Name)
 			return result.Name
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.warning("Name lookup via wmi query failed: %s", err)
 			raise ValueError(f"Can't find name for IP {host}: {err}") from err

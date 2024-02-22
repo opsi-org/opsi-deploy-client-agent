@@ -13,8 +13,7 @@ test:pytest-pylint:
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
     - poetry run pytest -vv
-    - poetry run pylint --disable=R,fixme opsideployclientagent
-    - poetry run flake8 opsideployclientagent
+    - poetry run ruff opsideployclientagent tests
 
 build:linux-pyinstaller:
   stage: build

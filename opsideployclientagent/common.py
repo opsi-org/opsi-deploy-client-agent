@@ -27,15 +27,15 @@ from opsicommon.client.opsiservice import get_service_client
 logger = get_logger("opsi-deploy-client-agent")
 monkeypatch_subprocess_for_frozen()
 
-backend = None  # pylint: disable=invalid-name
+backend = None
 
 
 def call_backend_method(method: str, params: list[Any]) -> Any:
-	global backend  # pylint: disable=global-statement
+	global backend
 	if not backend:
 		try:
 			backend = get_service_client()
-		except Exception:  # pylint: disable=broad-except
+		except Exception:
 			logger.error("Failed to get backend connection. Only works on >= 4.3 server")
 			logger.notice("On 4.2 servers use opsi-deploy-client-agent-4.2")
 			sys.exit(1)
@@ -124,8 +124,8 @@ class FiletransferUnsuccessful(Exception):
 	pass
 
 
-class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
-	def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+class DeployThread(threading.Thread):
+	def __init__(
 		self,
 		host: str,
 		username: str,
@@ -187,7 +187,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			logger.debug("Not a valid IP. Assuming FQDN.")
 			self.deployment_method = "fqdn"
 
-	def ask_host_for_hostname(self, host: str) -> str:  # pylint: disable=unused-argument
+	def ask_host_for_hostname(self, host: str) -> str:
 		raise NotImplementedError
 
 	def set_host_id(self, host: str) -> None:
@@ -225,7 +225,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 			if not self.host:
 				raise ValueError("No host name given")
 			ip_address = socket.gethostbyname(self.host)
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.warning("Failed to get ip address for host %s by syscall: %s", self.host, err)
 
 		if ip_address:
@@ -250,7 +250,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		try:
 			execute(f"ping -q -c2 {ip_address}")
 			alive = True
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.error(err)
 
 		if alive:
@@ -295,7 +295,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		try:
 			call_backend_method("objectToGroup_createObjects", [mapping])
 			logger.notice("Added %s to group %s", self.host, self.group)
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.warning("Adding %s to group %s failed: %s", self.host, self.group, err)
 
 	def _assign_client_to_depot(self) -> None:
@@ -311,7 +311,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		try:
 			call_backend_method("configState_createObjects", [depot_assignment])
 			logger.notice("Assigned %s to depot %s", self.host, self.depot)
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.warning("Assgining %s to depot %s failed: %s", self.host, self.depot, err)
 
 	@staticmethod
@@ -362,7 +362,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 		try:
 			logger.notice("Deleting client %s from backend", self.host)
 			call_backend_method("host_deleteObjects", [self.host])
-		except Exception as err:  # pylint: disable=broad-except
+		except Exception as err:
 			logger.error(err)
 
 	def _get_service_address(self, host_id: str) -> str:
@@ -437,7 +437,7 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 				except subprocess.TimeoutExpired:
 					self.result = "failed:timeout"
 					raise
-			except Exception as error:  # pylint: disable=broad-except
+			except Exception as error:
 				if self.result == "noattempt":
 					self.result = "failed:unknownreason"
 				logger.error("Deployment to %s failed: %s", self.host, error)
@@ -456,5 +456,5 @@ class DeployThread(threading.Thread):  # pylint: disable=too-many-instance-attri
 	def finalize(self) -> None:
 		raise NotImplementedError
 
-	def cleanup(self) -> None:  # pylint: disable=unused-argument
+	def cleanup(self) -> None:
 		raise NotImplementedError
