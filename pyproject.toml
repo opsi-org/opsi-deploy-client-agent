@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "opsi-deploy-client-agent"
-version = "4.3.0.1"
+version = "4.3.0.2"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 homepage = "https://www.opsi.org"
 license = "AGPL-3.0"
@@ -22,14 +22,11 @@ priority = "primary"
 name = "PyPI"
 priority = "supplemental"
 
-[tool.poetry.scripts]
-opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
-
 [tool.ruff]
 line-length = 140
 
-[tool.ruff.format]
-indent-style = "tab"
+[tool.poetry.scripts]
+opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -40,6 +37,9 @@ smbprotocol = "^1.13"
 gssapi = "^1.8"
 pydantic-core = "^2.20"
 annotated-types = "^0.7"
+
+[tool.ruff.format]
+indent-style = "tab"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5"
