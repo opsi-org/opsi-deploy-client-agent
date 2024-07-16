@@ -4,6 +4,7 @@ pyinstaller-poetry:
   hidden_imports:
     all:
       - paramiko
+      - gssapi
       - OPSI.Backend.File
       - OPSI.Backend.MySQL
   extra_args:
