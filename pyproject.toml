@@ -14,20 +14,22 @@ maintainers = [ "uib GmbH <info@uib.de>",]
 include = "opsideployclientagent"
 
 [[tool.poetry.source]]
-name = "uib"
-url = "https://pypi.uib.gmbh/simple/"
+name = "uibpypi"
+url = "https://pypi.uib.gmbh/simple"
 priority = "primary"
 
 [[tool.poetry.source]]
 name = "PyPI"
+priority = "supplemental"
 
-[tool.black]
-line-length = 140
-target-version = [ "py39", "py310",]
-use-tabs = true
+[tool.poetry.scripts]
+opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
 
 [tool.ruff]
 line-length = 140
+
+[tool.ruff.format]
+indent-style = "tab"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -38,12 +40,6 @@ smbprotocol = "^1.13"
 gssapi = "^1.8"
 pydantic-core = "^2.20"
 annotated-types = "^0.7"
-
-[tool.poetry.scripts]
-opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
-
-[tool.ruff.format]
-indent-style = "tab"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5"
