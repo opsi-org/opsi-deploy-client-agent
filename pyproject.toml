@@ -22,18 +22,18 @@ name = "PyPI"
 python = ">=3.11,<3.12"
 python-opsi-common = ">=4.3,<4.4"
 paramiko = "^2.9"
-impacket = "^0.10"
-smbprotocol = "^1.9"
-python-opsi = "^4.3.0.11"
+impacket = "^0.11"
+smbprotocol = "^1.13"
+gssapi = "^1.8"
 
 [tool.poetry.scripts]
 opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.2.2"
-pytest = "^7.0"
-pyinstaller = "^5.1"
-mypy = "^1.1"
+ruff = "^0.5"
+pytest = "^8.2"
+pyinstaller = "^6.9"
+mypy = "^1.10"
 
 [tool.black]
 line-length = 140
