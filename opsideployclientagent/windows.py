@@ -20,6 +20,7 @@ from contextlib import contextmanager
 from typing import Any
 
 import smbclient  # type: ignore[import]
+import smbclient.shutil  # type: ignore[import]
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]

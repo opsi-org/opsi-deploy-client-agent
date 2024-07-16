@@ -5,8 +5,6 @@ pyinstaller-poetry:
     all:
       - paramiko
       - gssapi
-      - OPSI.Backend.File
-      - OPSI.Backend.MySQL
   extra_args:
     darwin:
       - --exclude-module

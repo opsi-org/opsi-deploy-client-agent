@@ -26,6 +26,7 @@ installed via opsi.
 :copyright: uib GmbH <info@uib.de>
 :license: GNU Affero General Public License version 3
 """
+
 import sys
 import argparse
 from pathlib import Path
