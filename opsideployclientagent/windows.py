@@ -19,6 +19,7 @@ import warnings
 from contextlib import contextmanager
 from typing import Any
 
+import smbclient  # type: ignore[import]
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
@@ -26,7 +27,6 @@ from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
 from opsicommon.logging import get_logger
 from opsicommon.types import forceUnicode
-import smbclient  # type: ignore[import]
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful, execute
 
@@ -285,6 +285,7 @@ class WindowsDeployThread(DeployThread):
 			f" -c 'prompt; recurse; md opsi.org; cd opsi.org; md log; md tmp; cd tmp; md {folder_name};"
 			f" cd {folder_name}; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
 		)
+		self._remote_folder_created = True
 
 	def copy_data_smbprotocol(self) -> None:
 		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
@@ -309,6 +310,7 @@ class WindowsDeployThread(DeployThread):
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
 			smbclient.shutil.makedirs(log_folder, exist_ok=True)
 			smbclient.shutil.makedirs(self.remote_folder)
+			self._remote_folder_created = True
 			copy_dir("files", self.remote_folder)
 			smbclient.shutil.copy2("setup.opsiscript", self.remote_folder)
 			smbclient.shutil.copy2("oca-installation-helper.exe", self.remote_folder)
@@ -378,7 +380,7 @@ class WindowsDeployThread(DeployThread):
 
 	def cleanup(self) -> None:
 		logger.notice("Cleaning up")
-		if not self.remote_folder:
+		if not self.remote_folder or not self._remote_folder_created:
 			return
 		try:
 			if self.smbclient_cmd:

@@ -9,12 +9,12 @@ posix deployment module
 This module contains the class PosixDeployThread and related methods.
 """
 
-import sys
 import os
 import re
+import sys
 from contextlib import closing, contextmanager
-import paramiko  # type: ignore[import]
 
+import paramiko  # type: ignore[import]
 from opsicommon.logging import get_logger
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
@@ -76,6 +76,7 @@ class PosixDeployThread(DeployThread):
 		logger.notice("Copying installation scripts...")
 		try:
 			self._copy_over_ssh(os.path.join(local_folder, "files"), self.remote_folder)
+			self._remote_folder_created = True
 			if not os.path.exists(os.path.join(local_folder, "custom")):
 				os.makedirs(os.path.join(local_folder, "custom"))
 			self._copy_over_ssh(os.path.join(local_folder, "custom"), self.remote_folder)
@@ -139,7 +140,7 @@ class PosixDeployThread(DeployThread):
 
 	def cleanup(self) -> None:
 		try:
-			if self.remote_folder:
+			if self.remote_folder and self._remote_folder_created:
 				# remote_folder includes credentialsfile if any
 				# Cleanup is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(f"rm -rf {self.remote_folder}", timeout=120)

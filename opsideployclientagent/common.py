@@ -179,6 +179,7 @@ class DeployThread(threading.Thread):
 		self.host_object = None
 		self.install_timeout = install_timeout
 		self.remote_folder: str | None = None
+		self._remote_folder_created = False
 		self._should_stop = False
 
 	def stop(self) -> None:
