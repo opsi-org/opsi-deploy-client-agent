@@ -2192,4 +2192,4 @@ reference = "uib"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.12"
-content-hash = "50f74fdbb43acdaf836a3d1650ae0edfd59a838a73cfff7369cd3bd8b80629a5"
+content-hash = "adc3f58bce2f76abff1bcfb02c311564d05b89766e44ddc9eb1f26b84b3c940d"

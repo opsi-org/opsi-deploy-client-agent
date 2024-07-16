@@ -37,6 +37,7 @@ impacket = "^0.11"
 smbprotocol = "^1.13"
 gssapi = "^1.8"
 pydantic-core = "^2.20"
+annotated-types = "^0.7"
 
 [tool.poetry.scripts]
 opsi-deploy-client-agent = "opsideployclientagent.__main__:main"
