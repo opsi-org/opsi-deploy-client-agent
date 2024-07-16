@@ -13,7 +13,6 @@ import logging
 import ntpath
 import os
 import re
-import shutil
 import time
 import warnings
 from contextlib import contextmanager
@@ -113,7 +112,7 @@ class WindowsDeployThread(DeployThread):
 		)
 
 		self.remote_folder: str | None = None
-		self.smbclient_cmd = shutil.which("smbclient")
+		self.smbclient_cmd = None  # shutil.which("smbclient")
 
 	def get_connection_data(self, host: str | None) -> tuple[str, str, str]:
 		host = forceUnicode(host or self.network_address)
