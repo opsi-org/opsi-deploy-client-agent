@@ -27,16 +27,16 @@ installed via opsi.
 :license: GNU Affero General Public License version 3
 """
 
-import sys
 import argparse
+import sys
 from pathlib import Path
+
 import paramiko  # type: ignore[import]
-
 from opsicommon import __version__ as python_opsi_common_version
-from opsicommon.logging import logging_config, get_logger
-from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG
+from opsicommon.logging import get_logger, logging_config
+from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_DEBUG, LOG_WARNING
 
-from opsideployclientagent import deploy_client_agent, __version__
+from opsideployclientagent import __version__, deploy_client_agent
 from opsideployclientagent.common import get_product_id
 
 logger = get_logger("opsi-deploy-client-agent")
@@ -129,6 +129,7 @@ def parse_args(target_os: str) -> argparse.Namespace:
 			action="store_const",
 			help="Warn when encountering unknown SSH hostkeys. (Default)",
 		)
+		parser.add_argument("--ssh-port", dest="ssh_port", default=22, type=int, help="Port to use for SSH connection (default: 22)")
 
 	finalize_action_group = parser.add_mutually_exclusive_group()
 	finalize_action_group.add_argument(
@@ -223,6 +224,7 @@ def main() -> None:
 		skip_existing_client=args.skip_existing_client,
 		keep_client_on_failure=args.keep_client_on_failure,
 		ssh_hostkey_policy=ssh_hostkey_policy,
+		ssh_port=args.ssh_port,
 		install_timeout=args.install_timeout,
 		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None,
 	)

@@ -10,7 +10,7 @@ that are already running an operating system that has not been
 installed via opsi.
 """
 
-__version__ = "4.3.0.0"
+__version__ = "4.3.0.2"
 
 
 import getpass
@@ -20,6 +20,7 @@ from pathlib import Path
 import paramiko  # type: ignore[import]
 from opsicommon.logging import get_logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
+
 from opsideployclientagent.common import DeployThread, backend_disconnect, get_backend
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
@@ -71,6 +72,7 @@ def deploy_client_agent(
 	skip_existing_client: bool = False,
 	keep_client_on_failure: bool = True,
 	ssh_hostkey_policy: paramiko.MissingHostKeyPolicy | None = None,
+	ssh_port: int = 22,
 	install_timeout: int | None = None,
 	failed_clients_file: Path | None = None,
 ) -> int:
@@ -155,6 +157,7 @@ def deploy_client_agent(
 				if target_os in ("linux", "macos"):
 					client_config["ssh_policy"] = ssh_hostkey_policy or paramiko.WarningPolicy
 					client_config["target_os"] = target_os
+					client_config["ssh_port"] = ssh_port
 
 				thread = DeploymentClass(**client_config)
 				total += 1
