@@ -42,6 +42,7 @@ class PosixDeployThread(DeployThread):
 		depot=None,
 		group=None,
 		ssh_policy=paramiko.WarningPolicy,
+		ssh_port=22,
 		install_timeout=None,
 	):
 		DeployThread.__init__(
@@ -63,6 +64,7 @@ class PosixDeployThread(DeployThread):
 		self.target_os = target_os
 		self._ssh_connection = None
 		self._ssh_policy = ssh_policy
+		self.ssh_port = ssh_port
 		self.credentialsfile = None
 
 	def copy_data(self) -> None:
@@ -157,7 +159,7 @@ class PosixDeployThread(DeployThread):
 		if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", host):
 			ssh = paramiko.SSHClient()
 			ssh.set_missing_host_key_policy(self._ssh_policy())
-			ssh.connect(host, "22", self.username, self.password)
+			ssh.connect(host, self.ssh_port, self.username, self.password)
 			_, stdout, _ = ssh.exec_command("hostname -f")
 			host_id = stdout.readlines()[0].encode("ascii", "ignore").strip()
 			logger.info("resolved FQDN: %s (type %s)", host_id, type(host_id))
@@ -209,6 +211,7 @@ class PosixDeployThread(DeployThread):
 			hostname=self.network_address,
 			username=self.username,
 			password=self.password,
+			port=self.ssh_port,
 		)
 
 	def _copy_over_ssh(self, local_path: str, remote_path: str) -> None:
