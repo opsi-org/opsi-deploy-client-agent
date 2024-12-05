@@ -88,10 +88,6 @@ class PosixDeployThread(DeployThread):
 			raise FiletransferUnsuccessful from error
 
 	def run_installation(self) -> None:
-		if self.target_os == "linux":
-			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script/opsi-*")
-		elif self.target_os == "macos":
-			self._execute_via_ssh(f"chmod +x {self.remote_folder}/files/opsi-script.app/Contents/MacOS/opsi-*")
 		self._execute_via_ssh(f"chmod +x {self.remote_folder}/oca-installation-helper")
 		if not self.host_object:
 			raise ValueError("No valid host object found.")
