@@ -4,7 +4,7 @@ build-backend = "poetry.masonry.api"
 
 [tool.poetry]
 name = "opsi-deploy-client-agent"
-version = "4.4.0.0"
+version = "4.3.1.0"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 homepage = "https://www.opsi.org"
 license = "AGPL-3.0"
