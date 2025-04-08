@@ -8,7 +8,7 @@ stages:
 test:pytest-pylint:
   stage: test
   script:
-    - poetry lock --no-update
+    - poetry lock
     - poetry install
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
@@ -19,7 +19,7 @@ test:pytest-pylint:
 build:linux-pyinstaller:
   stage: build
   script:
-    - poetry lock --no-update
+    - poetry lock
     - poetry install
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
