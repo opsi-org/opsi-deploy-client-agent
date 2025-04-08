@@ -1,4 +1,4 @@
-image: docker.uib.gmbh/opsi/dev/pybuilder:uib-python-3.11
+image: docker.uib.gmbh/opsi/dev/pybuilder:deb9-py3.13
 
 stages:
   - test
@@ -8,17 +8,18 @@ stages:
 test:pytest-pylint:
   stage: test
   script:
-    - poetry lock --no-update
+    - poetry lock
     - poetry install
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
     - poetry run pytest -vv
-    - poetry run ruff opsideployclientagent tests
+    - poetry run ruff check opsideployclientagent tests
+    - poetry run mypy opsideployclientagent tests
 
 build:linux-pyinstaller:
   stage: build
   script:
-    - poetry lock --no-update
+    - poetry lock
     - poetry install
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
