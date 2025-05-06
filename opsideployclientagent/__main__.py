@@ -1,42 +1,27 @@
-# -*- coding: utf-8 -*-
+# opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
+# Copyright (c) 2020-2025 uib GmbH <info@uib.de>
+# This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
+# License: AGPL-3.0-only
 
-# This tool is part of the desktop management solution opsi
-# (open pc server integration) http://www.opsi.org
-# Copyright (C) 2007-2019 uib GmbH <info@uib.de>
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 opsi-deploy-client-agent
 
 This script can be used to deploy the opsi-client-agent to systems
 that are already running an operating system that has not been
 installed via opsi.
-
-:copyright: uib GmbH <info@uib.de>
-:license: GNU Affero General Public License version 3
 """
 
-import sys
 import argparse
+import sys
+import traceback
 from pathlib import Path
+
 import paramiko  # type: ignore[import]
-
 from opsicommon import __version__ as python_opsi_common_version
-from opsicommon.logging import logging_config, get_logger
-from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_WARNING, LOG_DEBUG
+from opsicommon.logging import get_logger, logging_config
+from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_DEBUG, LOG_WARNING
 
-from opsideployclientagent import deploy_client_agent, __version__
+from opsideployclientagent import __version__, deploy_client_agent
 from opsideployclientagent.common import get_product_id
 
 logger = get_logger("opsi-deploy-client-agent")
@@ -177,7 +162,7 @@ def parse_args(target_os: str) -> argparse.Namespace:
 		dest="keep_client_on_failure",
 		default=True,
 		action="store_true",
-		help=("If the client was created in opsi through this script it will not " "be removed in case of failure. (DEFAULT)"),
+		help=("If the client was created in opsi through this script it will not be removed in case of failure. (DEFAULT)"),
 	)
 	client_removal_group.add_argument(
 		"--remove-client-on-failure",
@@ -193,7 +178,7 @@ def parse_args(target_os: str) -> argparse.Namespace:
 	return args
 
 
-def main() -> None:
+def _main() -> None:
 	target_os = get_target_os()
 	args = parse_args(target_os)
 
@@ -227,3 +212,23 @@ def main() -> None:
 		failed_clients_file=Path(args.failed_clients_file) if args.failed_clients_file else None,
 	)
 	sys.exit(returncode)
+
+
+def main() -> None:
+	try:
+		_main()
+	except SystemExit as err:
+		sys.exit(err.code)
+	except KeyboardInterrupt:
+		print("Interrupted", file=sys.stderr)
+		sys.exit(1)
+	except Exception:
+		# Do not let pyinstaller handle exceptions and print:
+		# "Failed to execute script run-opsiutils"
+		traceback.print_exc()
+		sys.exit(1)
+	sys.exit(0)
+
+
+if __name__ == "__main__":
+	main()
