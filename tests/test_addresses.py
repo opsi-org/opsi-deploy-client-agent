@@ -10,11 +10,11 @@ basic tests for address handling of DeployThreads
 """
 
 import socket
+
 import pytest
 
 from opsideployclientagent.common import DeployThread
 
-BACKEND = None
 SUFFIX = ".".join(socket.getfqdn().split(".")[1:])
 
 
@@ -29,10 +29,9 @@ SUFFIX = ".".join(socket.getfqdn().split(".")[1:])
 		("localhost", "hostname", "hostname"),
 	),
 )
-def test_detect_deployment_method(host, method, result_method):
+def test_detect_deployment_method(host: str, method: str, result_method: str) -> None:
 	deploy_thread = DeployThread(
 		host,
-		BACKEND,
 		"testuser",
 		"testpassword",
 		deployment_method=method,
@@ -48,10 +47,9 @@ def test_detect_deployment_method(host, method, result_method):
 		("localhost", f"localhost.{SUFFIX}"),
 	),
 )
-def test_set_host_id(host, result_host):
+def test_set_host_id(host: str, result_host: str) -> None:
 	deploy_thread = DeployThread(
 		host,
-		BACKEND,
 		"testuser",
 		"testpassword",
 	)

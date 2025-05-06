@@ -13,6 +13,7 @@ import os
 import re
 import sys
 from contextlib import closing, contextmanager
+from typing import Generator
 
 import paramiko  # type: ignore[import]
 from opsicommon.logging import get_logger
@@ -29,20 +30,20 @@ class SSHRemoteExecutionException(Exception):
 class PosixDeployThread(DeployThread):
 	def __init__(
 		self,
-		host,
-		username,
-		password,
-		target_os,
-		finalize_action="start_service",
-		deployment_method="hostname",
-		stop_on_ping_failure=True,
-		skip_existing_client=False,
-		keep_client_on_failure=False,
-		additional_client_settings=None,
-		depot=None,
-		group=None,
-		ssh_policy=paramiko.WarningPolicy,
-		install_timeout=None,
+		host: str,
+		username: str,
+		password: str,
+		target_os: str,
+		finalize_action: str = "start_service",
+		deployment_method: str = "hostname",
+		stop_on_ping_failure: bool = True,
+		skip_existing_client: bool = False,
+		keep_client_on_failure: bool = False,
+		additional_client_settings: dict[str, str] | None = None,
+		depot: str | None = None,
+		group: str | None = None,
+		ssh_policy: type[paramiko.MissingHostKeyPolicy] = paramiko.WarningPolicy,
+		install_timeout: int | None = None,
 	):
 		DeployThread.__init__(
 			self,
@@ -178,6 +179,7 @@ class PosixDeployThread(DeployThread):
 				command = f"sudo --stdin -- {command} < {self.credentialsfile}"
 		logger.info("Executing on remote: %s", command)
 
+		assert self._ssh_connection
 		with closing(self._ssh_connection.get_transport().open_session(timeout=timeout)) as channel:
 			channel.set_combine_stderr(True)
 
@@ -197,6 +199,7 @@ class PosixDeployThread(DeployThread):
 			return
 
 		self._ssh_connection = paramiko.SSHClient()
+		assert self._ssh_connection
 		self._ssh_connection.load_system_host_keys()
 		self._ssh_connection.set_missing_host_key_policy(self._ssh_policy())
 
@@ -209,13 +212,13 @@ class PosixDeployThread(DeployThread):
 
 	def _copy_over_ssh(self, local_path: str, remote_path: str) -> None:
 		@contextmanager
-		def change_directory(path):
+		def change_directory(path: str) -> Generator[None, None, None]:
 			current_dir = os.getcwd()
 			os.chdir(path)
 			yield
 			os.chdir(current_dir)
 
-		def create_folder_if_missing(path):
+		def create_folder_if_missing(ftp_connection: paramiko.SFTPClient, path: str) -> None:
 			try:
 				ftp_connection.mkdir(path)
 			except Exception as err:
@@ -223,6 +226,7 @@ class PosixDeployThread(DeployThread):
 
 		self._connect_via_ssh()
 
+		assert self._ssh_connection
 		with closing(self._ssh_connection.open_sftp()) as ftp_connection:
 			if not os.path.exists(local_path):
 				raise ValueError(f"Can't find local path '{local_path}'")
@@ -231,7 +235,7 @@ class PosixDeployThread(DeployThread):
 				ftp_connection.put(local_path, remote_path)
 				return
 
-			create_folder_if_missing(remote_path)
+			create_folder_if_missing(ftp_connection, remote_path)
 			# The following stunt is necessary to get results in 'dirpath'
 			# that can be easily used for folder creation on the remote.
 			with change_directory(os.path.join(local_path, "..")):
