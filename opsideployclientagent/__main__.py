@@ -60,36 +60,71 @@ def parse_args(target_os: str) -> argparse.Namespace:
 		default_user = "Administrator"
 
 	parser = argparse.ArgumentParser(description=script_description)
-	parser.add_argument("--version", "-V", action="version", version=f"{__version__} [python-opsi-common={python_opsi_common_version}]")
 	parser.add_argument(
-		"--verbose", "-v", dest="log_level", default=LOG_WARNING, action="count", help="increase verbosity (can be used multiple times)"
+		"--version",
+		"-V",
+		action="version",
+		version=f"{__version__} [python-opsi-common={python_opsi_common_version}]",
 	)
-	parser.add_argument("--debug-file", dest="debug_file", help="Write debug output to given file.")
+	parser.add_argument(
+		"--verbose",
+		"-v",
+		dest="log_level",
+		default=LOG_WARNING,
+		action="count",
+		help="Increase verbosity (can be used multiple times)",
+	)
+	parser.add_argument(
+		"--debug-file",
+		dest="debug_file",
+		help="Write debug output to given file.",
+	)
 	parser.add_argument(
 		"--username",
 		"-u",
 		dest="username",
 		default=default_user,
-		help=f"username for authentication (default: {default_user})." + r"Example for a domain account: -u <DOMAIN>\\<username>",
+		help=f"Username for authentication (default: {default_user})." + r"Example for a domain account: -u <DOMAIN>\\<username>",
 	)
-	parser.add_argument("--password", "-p", dest="password", default="", help="password for authentication")
+	parser.add_argument(
+		"--password",
+		"-p",
+		dest="password",
+		default="",
+		help="Password for authentication",
+	)
+
 	network_access_group = parser.add_mutually_exclusive_group()
 	network_access_group.add_argument(
-		"--use-fqdn", "-c", dest="deployment_method", action="store_const", const="fqdn", help="Use FQDN to connect to client."
+		"--use-fqdn",
+		"-c",
+		dest="deployment_method",
+		action="store_const",
+		const="fqdn",
+		help="Use FQDN to connect to client.",
 	)
 	network_access_group.add_argument(
-		"--use-hostname", dest="deployment_method", action="store_const", const="hostname", help="Use hostname to connect to client."
+		"--use-hostname",
+		dest="deployment_method",
+		action="store_const",
+		const="hostname",
+		help="Use hostname to connect to client.",
 	)
 	network_access_group.add_argument(
-		"--use-ip-address", dest="deployment_method", action="store_const", const="ip", help="Use IP address to connect to client."
+		"--use-ip-address",
+		dest="deployment_method",
+		action="store_const",
+		const="ip",
+		help="Use IP address to connect to client.",
 	)
+
 	parser.add_argument(
 		"--ignore-failed-ping",
 		"-x",
 		dest="stop_on_ping_failure",
 		default=True,
 		action="store_false",
-		help="try installation even if ping fails",
+		help="Try installation even if ping fails",
 	)
 	if target_os in ("linux", "macos"):
 		ssh_policy_group = parser.add_mutually_exclusive_group()
@@ -117,10 +152,20 @@ def parse_args(target_os: str) -> argparse.Namespace:
 
 	finalize_action_group = parser.add_mutually_exclusive_group()
 	finalize_action_group.add_argument(
-		"--reboot", "-r", dest="finalize_action", const="reboot", action="store_const", help="reboot computer after installation"
+		"--reboot",
+		"-r",
+		dest="finalize_action",
+		const="reboot",
+		action="store_const",
+		help="Reboot computer after installation",
 	)
 	finalize_action_group.add_argument(
-		"--shutdown", "-s", dest="finalize_action", const="shutdown", action="store_const", help="shutdown computer after installation"
+		"--shutdown",
+		"-s",
+		dest="finalize_action",
+		const="shutdown",
+		action="store_const",
+		help="Shutdown computer after installation",
 	)
 	finalize_action_group.add_argument(
 		"--start-opsiclientd",
@@ -148,13 +193,37 @@ def parse_args(target_os: str) -> argparse.Namespace:
 		),
 	)
 	parser.add_argument(
-		"--skip-existing-clients", "-S", dest="skip_existing_client", default=False, action="store_true", help="skip known opsi clients"
+		"--skip-existing-clients",
+		"-S",
+		dest="skip_existing_client",
+		default=False,
+		action="store_true",
+		help="Skip known opsi clients",
 	)
-	parser.add_argument("--threads", "-t", dest="max_threads", default=1, type=int, help="number of concurrent deployment threads")
-	parser.add_argument("--install-timeout", default=None, type=float, help="timeout for single threads (default is unlimited)")
+	parser.add_argument(
+		"--threads",
+		"-t",
+		dest="max_threads",
+		default=1,
+		type=int,
+		help="Number of concurrent deployment threads",
+	)
+	parser.add_argument(
+		"--install-timeout",
+		default=None,
+		type=float,
+		help="Timeout for single threads (default is unlimited)",
+	)
 
-	parser.add_argument("--depot", help="Assign new clients to the given depot.")
-	parser.add_argument("--group", dest="group", help="Assign fresh clients to an already existing group.")
+	parser.add_argument(
+		"--depot",
+		help="Assign new clients to the given depot.",
+	)
+	parser.add_argument(
+		"--group",
+		dest="group",
+		help="Assign fresh clients to an already existing group.",
+	)
 
 	client_removal_group = parser.add_mutually_exclusive_group()
 	client_removal_group.add_argument(
@@ -170,11 +239,23 @@ def parse_args(target_os: str) -> argparse.Namespace:
 		action="store_false",
 		help="If the client was created in opsi through this script it will be removed in case of failure.",
 	)
-	parser.add_argument("--failed-clients-file", help="filename to store list of failed clients in")
-	parser.add_argument("host", nargs="*", help="The hosts to deploy the opsi-client-agent to.")
+	parser.add_argument(
+		"--failed-clients-file",
+		help="Filename to store list of failed clients in",
+	)
+	parser.add_argument(
+		"host",
+		nargs="*",
+		help="The hosts to deploy the opsi-client-agent to.",
+	)
 
 	args = parser.parse_args()
-	logging_config(stderr_level=args.log_level, stderr_format=DEFAULT_COLORED_FORMAT, log_file=args.debug_file, file_level=LOG_DEBUG)
+	logging_config(
+		stderr_level=args.log_level,
+		stderr_format=DEFAULT_COLORED_FORMAT,
+		log_file=args.debug_file,
+		file_level=LOG_DEBUG,
+	)
 	return args
 
 
