@@ -1,23 +1,24 @@
-pyinstaller-poetry:
+project:
+  licenses:
+    - license: AGPL-3.0-only
+      header: |
+        opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
+        Copyright (c) 2020-{year} uib GmbH <info@uib.de>
+        This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
+        License: {license}
+
+pyinstaller:
   one_file: yes
   strip: yes
   hidden_imports:
     all:
       - paramiko
-      - OPSI.Backend.File
-      - OPSI.Backend.MySQL
+      - gssapi
   extra_args:
     darwin:
       - --exclude-module
       - tkinter
   scripts:
-    - script: run-opsi-deploy-client-agent
+    - script: opsideployclientagent/__main__.py
       binaries:
         - opsi-deploy-client-agent
-  data_files: []
-  dirname: opsideployclientagent
-  locale_install: []
-  after_script:
-    linux: []
-    darwin: []
-    windows: []

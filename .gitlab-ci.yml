@@ -1,29 +1,30 @@
-image: docker.uib.gmbh/opsi/dev/pybuilder:deb9-py3.13
+image: docker.uib.gmbh/opsi/dev/pybuilder:deb9-py3.11
 
 stages:
   - test
   - build
 
-
 test:pytest-pylint:
   stage: test
   script:
-    - poetry lock
-    - poetry install
+    - export UV_PYTHON="3.13"
+    - export UV_PYTHON_PREFERENCE="only-managed"
+    - uv sync --frozen
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
-    - poetry run pytest -vv
-    - poetry run ruff check opsideployclientagent tests
-    - poetry run mypy opsideployclientagent tests
+    - uv run pytest -vv
+    - uv run ruff check opsideployclientagent tests
+    - uv run mypy opsideployclientagent tests
 
 build:linux-pyinstaller:
   stage: build
   script:
-    - poetry lock
-    - poetry install
+    - export UV_PYTHON="3.13"
+    - export UV_PYTHON_PREFERENCE="only-managed"
+    - uv sync --frozen
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
-    - poetry run opsi-dev-cli -l info pyinstaller build
+    - uv run opsi-dev-cli -l info pyinstaller build
     - ./dist/opsi-deploy-client-agent --version
     - '[ "$CI_COMMIT_TAG" = "" ] && opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent --prerelease="$CI_JOB_ID"'
     - '[ "$CI_COMMIT_TAG" = "" ] || opsi-dev-cli -l info binary push dist/opsi-deploy-client-agent'

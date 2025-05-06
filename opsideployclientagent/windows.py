@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
-
-# Copyright (c) uib GmbH <info@uib.de>
-# License: AGPL-3.0
+# opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
+# Copyright (c) 2020-2025 uib GmbH <info@uib.de>
+# This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
+# License: AGPL-3.0-only
 
 """
 windows deployment module
@@ -13,12 +13,13 @@ import logging
 import ntpath
 import os
 import re
-import shutil
 import time
 import warnings
 from contextlib import contextmanager
 from typing import Any
 
+import smbclient  # type: ignore[import]
+import smbclient.shutil  # type: ignore[import]
 from impacket.dcerpc.v5 import transport, tsch  # type: ignore[import]
 from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
@@ -26,9 +27,8 @@ from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
 from opsicommon.logging import get_logger
 from opsicommon.types import forceUnicode
-import smbclient  # type: ignore[import]
 
-from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful, execute
+from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
 logger = get_logger("opsi-deploy-client-agent")
 
@@ -112,7 +112,6 @@ class WindowsDeployThread(DeployThread):
 		)
 
 		self.remote_folder: str | None = None
-		self.smbclient_cmd = shutil.which("smbclient")
 
 	def get_connection_data(self, host: str | None) -> tuple[str, str, str]:
 		host = forceUnicode(host or self.network_address)
@@ -268,25 +267,7 @@ class WindowsDeployThread(DeployThread):
 			logger.warning("Did not get target os version.")
 
 		logger.notice("Copying installation files")
-		if self.smbclient_cmd:
-			logger.info("Using smbclient to copy files")
-			self.copy_data_smbclient()
-			return
-		logger.info("Using smbprotocol to copy files")
-		self.copy_data_smbprotocol()
 
-	def copy_data_smbclient(self) -> None:
-		folder_name = f"opsi-deploy-client-agent-{int(time.time())}"
-		self.remote_folder = rf"c:\opsi.org\tmp\{folder_name}"
-		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
-		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-		execute(
-			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
-			f" -c 'prompt; recurse; md opsi.org; cd opsi.org; md log; md tmp; cd tmp; md {folder_name};"
-			f" cd {folder_name}; mput files; mput setup.opsiscript; mput oca-installation-helper.exe; exit;'"
-		)
-
-	def copy_data_smbprotocol(self) -> None:
 		self.remote_folder = rf"\\{self.network_address}\c$\opsi.org\tmp\opsi-deploy-client-agent-{int(time.time())}"
 
 		def copy_dir(src_dir: str, dst_dir: str) -> None:
@@ -309,6 +290,7 @@ class WindowsDeployThread(DeployThread):
 			log_folder = rf"\\{self.network_address}\c$\opsi.org\log"
 			smbclient.shutil.makedirs(log_folder, exist_ok=True)
 			smbclient.shutil.makedirs(self.remote_folder)
+			self._remote_folder_created = True
 			copy_dir("files", self.remote_folder)
 			smbclient.shutil.copy2("setup.opsiscript", self.remote_folder)
 			smbclient.shutil.copy2("oca-installation-helper.exe", self.remote_folder)
@@ -362,15 +344,8 @@ class WindowsDeployThread(DeployThread):
 			except Exception as err:
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
-	def cleanup_files_smbclient(self) -> None:
-		credentials = self.username + "%" + self.password.replace("'", "'\"'\"'")
-		debug_param = " -d 9" if logger.isEnabledFor(logging.DEBUG) else ""
-		execute(
-			f"{self.smbclient_cmd} -m SMB3{debug_param} //{self.network_address}/c$ -U '{credentials}'"
-			f" -c 'prompt; recurse; deltree {self.remote_folder}; exit;'"
-		)
-
-	def cleanup_files_smbprotocol(self) -> None:
+	def cleanup_files(self) -> None:
+		logger.info("Cleaning up files")
 		smbclient.register_session(server=self.network_address, username=self.username, password=self.password)
 		if smbclient.shutil.isdir(self.remote_folder):
 			logger.info("Deleting remote folder: %s", self.remote_folder)
@@ -378,15 +353,10 @@ class WindowsDeployThread(DeployThread):
 
 	def cleanup(self) -> None:
 		logger.notice("Cleaning up")
-		if not self.remote_folder:
+		if not self.remote_folder or not self._remote_folder_created:
 			return
 		try:
-			if self.smbclient_cmd:
-				logger.info("Using smbclient to cleanup files")
-				self.cleanup_files_smbclient()
-			else:
-				logger.info("Using smbprotocol to cleanup files")
-				self.cleanup_files_smbprotocol()
+			self.cleanup_files()
 		except Exception as err:
 			logger.error("Cleanup failed: %s", err)
 		finally:

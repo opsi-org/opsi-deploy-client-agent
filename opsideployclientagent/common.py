@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
-
-# Copyright (c) uib GmbH <info@uib.de>
-# License: AGPL-3.0
+# opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
+# Copyright (c) 2020-2025 uib GmbH <info@uib.de>
+# This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
+# License: AGPL-3.0-only
 
 """
 common deployment module
@@ -17,7 +17,6 @@ import sys
 import threading
 import time
 
-from OPSI.Backend.BackendManager import BackendManager  # type: ignore[import]
 from opsicommon.client.opsiservice import ServiceClient, get_service_client
 from opsicommon.logging import get_logger, log_context, secret_filter
 from opsicommon.objects import (
@@ -35,20 +34,10 @@ monkeypatch_subprocess_for_frozen()
 backend = None
 
 
-def get_backend() -> BackendManager | ServiceClient:
+def get_backend() -> ServiceClient:
 	global backend
 	if not backend:
-		try:
-			backend = get_service_client()
-		except Exception:
-			backend = BackendManager(
-				dispatchConfigFile="/etc/opsi/backendManager/dispatch.conf",
-				dispatchIgnoreModules=["OpsiPXEConfd", "DHCPD"],
-				backendConfigDir="/etc/opsi/backends",
-				extend=True,
-				depotbackend=False,
-				hostControlBackend=False,
-			)
+		backend = get_service_client()
 	return backend
 
 
@@ -179,6 +168,7 @@ class DeployThread(threading.Thread):
 		self.host_object = None
 		self.install_timeout = install_timeout
 		self.remote_folder: str | None = None
+		self._remote_folder_created = False
 		self._should_stop = False
 
 	def stop(self) -> None:

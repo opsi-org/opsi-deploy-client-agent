@@ -1,17 +1,9 @@
-# -*- coding: utf-8 -*-
+# opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
+# Copyright (c) 2020-2025 uib GmbH <info@uib.de>
+# This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
+# License: AGPL-3.0-only
 
-# Copyright (c) uib GmbH <info@uib.de>
-# License: AGPL-3.0
-"""
-opsi-deploy-client-agent
-
-This script can be used to deploy the opsi-client-agent to systems
-that are already running an operating system that has not been
-installed via opsi.
-"""
-
-__version__ = "4.3.1.0"
-
+__version__ = "4.3.2.0"
 
 import getpass
 import time
@@ -20,6 +12,7 @@ from pathlib import Path
 import paramiko  # type: ignore[import]
 from opsicommon.logging import get_logger, secret_filter
 from opsicommon.types import forceUnicode, forceUnicodeLower
+
 from opsideployclientagent.common import DeployThread, backend_disconnect, get_backend
 from opsideployclientagent.posix import PosixDeployThread
 from opsideployclientagent.windows import WindowsDeployThread
@@ -195,4 +188,5 @@ def deploy_client_agent(
 		if failed_clients_file:
 			write_failed_clients(failed_clients, failed_clients_file)
 		return 1
+	return 0
 	return 0
