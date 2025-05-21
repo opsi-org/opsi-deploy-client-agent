@@ -241,7 +241,7 @@ class PosixDeployThread(DeployThread):
 			with change_directory(os.path.join(local_path, "..")):
 				directory_to_walk = os.path.basename(local_path)
 				for dirpath, _, filenames in os.walk(directory_to_walk):
-					create_folder_if_missing(os.path.join(remote_path, dirpath))
+					create_folder_if_missing(ftp_connection, os.path.join(remote_path, dirpath))
 
 					for filename in filenames:
 						local = os.path.join(dirpath, filename)
