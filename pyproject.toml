@@ -1,6 +1,6 @@
 [project]
 name = "opsi-deploy-client-agent"
-version = "4.3.2.0"
+version = "4.3.2.1"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 readme = "README.md"
 license = "AGPL-3.0-only"
