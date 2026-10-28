@@ -25,8 +25,7 @@ from impacket.dcerpc.v5.dcom import wmi  # type: ignore[import]
 from impacket.dcerpc.v5.dcomrt import DCOMConnection  # type: ignore[import]
 from impacket.dcerpc.v5.dtypes import NULL  # type: ignore[import]
 from impacket.dcerpc.v5.rpcrt import RPC_C_AUTHN_LEVEL_PKT_PRIVACY  # type: ignore[import]
-from opsicommon.logging import get_logger
-from opsicommon.types import forceUnicode
+from opsi.logging import get_logger
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
@@ -37,7 +36,7 @@ PROCESS_MAX_TIMEOUT = 3600
 
 for _logger in ("smbprotocol.open", "smbprotocol.tree"):
 	smbclient_logger = logging.getLogger(_logger)
-	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment,attr-defined]
+	smbclient_logger.debug = smbclient_logger.trace  # type: ignore[assignment,attr-defined]  # ty: ignore[unresolved-attribute]
 	smbclient_logger.info = smbclient_logger.debug  # type: ignore[assignment]
 
 
@@ -70,7 +69,8 @@ def dcom_connection(host: str, username: str, password: str) -> Any:
 		i_wbem_level_1_login.RemRelease()
 		yield i_wbem_services
 	except Exception as error:
-		logger.error("Could not open DCOM connection: %s", error, exc_info=True)
+		logger.error("Could not open DCOM connection: %s", error, exc_info=True)  # noqa: G201
+		logger.error("Please make sure that Ports for SMB (TCP 445) and WMI (TCP 135 + TCP 49152-65535) are not blocked by a firewall.")
 	finally:
 		if dcom:
 			with warnings.catch_warnings():
@@ -114,9 +114,9 @@ class WindowsDeployThread(DeployThread):
 		self.remote_folder: str | None = None
 
 	def get_connection_data(self, host: str | None) -> tuple[str, str, str]:
-		host = forceUnicode(host or self.network_address)
-		username = forceUnicode(self.username)
-		password = forceUnicode(self.password)
+		host = host or self.network_address
+		username = self.username
+		password = self.password
 
 		match = re.search(r"^([^\\\\]+)\\\\+([^\\\\]+)$", username)
 		if match:
@@ -127,7 +127,6 @@ class WindowsDeployThread(DeployThread):
 		# WMI exec requires to logon the given user.
 		# This will fail in a lot of cases.
 		# See https://www.sysadmins.lv/retired-msft-blogs/alejacma/win32processcreate-fails-if-user-profile-is-not-loaded.aspx
-		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
 		if not host:
@@ -170,7 +169,6 @@ class WindowsDeployThread(DeployThread):
 			return query_result.Next(0xFFFFFFFF, 1)[0]
 
 	def tsch_exec(self, cmd: str, host: str | None = None, timeout: int | None = None) -> None:
-		cmd = forceUnicode(cmd)
 		timeout = timeout or PROCESS_MAX_TIMEOUT
 		host, username, password = self.get_connection_data(host)
 		domain = ""
@@ -295,13 +293,13 @@ class WindowsDeployThread(DeployThread):
 			smbclient.shutil.copy2("setup.opsiscript", self.remote_folder)
 			smbclient.shutil.copy2("oca-installation-helper.exe", self.remote_folder)
 		except Exception as error:
-			logger.error("Failed to copy installation files: %s", error, exc_info=True)
+			logger.exception("Failed to copy installation files")
 			raise FiletransferUnsuccessful from error
 		finally:
 			try:
 				smbclient.delete_session(server=self.network_address)
-			except Exception:
-				pass
+			except Exception as error:  # noqa: BLE001
+				logger.debug("Failed to delete SMB session: %s", error)
 
 	def run_installation(self) -> None:
 		if not self.remote_folder:
@@ -341,7 +339,7 @@ class WindowsDeployThread(DeployThread):
 		if cmd:
 			try:
 				self.tsch_exec(cmd, timeout=30)
-			except Exception as err:
+			except Exception as err:  # noqa: BLE001
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup_files(self) -> None:
@@ -357,13 +355,13 @@ class WindowsDeployThread(DeployThread):
 			return
 		try:
 			self.cleanup_files()
-		except Exception as err:
+		except Exception as err:  # noqa: BLE001
 			logger.error("Cleanup failed: %s", err)
 		finally:
 			try:
 				smbclient.delete_session(server=self.network_address)
-			except Exception:
-				pass
+			except Exception as error:  # noqa: BLE001
+				logger.debug("Failed to delete SMB session: %s", error)
 
 	def ask_host_for_hostname(self, host: str) -> str:
 		# preferably host should be an ip

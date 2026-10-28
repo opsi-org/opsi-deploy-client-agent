@@ -7,19 +7,19 @@ stages:
 test:pytest-pylint:
   stage: test
   script:
-    - export UV_PYTHON="3.13"
+    - export UV_PYTHON="3.15"
     - export UV_PYTHON_PREFERENCE="only-managed"
     - uv sync --frozen
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
     - uv run pytest -vv
     - uv run ruff check opsideployclientagent tests
-    - uv run mypy opsideployclientagent tests
+    - uv run ty check opsideployclientagent tests
 
 build:linux-pyinstaller:
   stage: build
   script:
-    - export UV_PYTHON="3.13"
+    - export UV_PYTHON="3.15"
     - export UV_PYTHON_PREFERENCE="only-managed"
     - uv sync --frozen
     # Conflicts with smbclient package

@@ -9,6 +9,7 @@ common deployment module
 This module contains the class DeployThread and related methods.
 """
 
+import ipaddress
 import os
 import re
 import socket
@@ -17,19 +18,16 @@ import sys
 import threading
 import time
 
-from opsicommon.client.opsiservice import ServiceClient, get_service_client
-from opsicommon.logging import get_logger, log_context, secret_filter
-from opsicommon.objects import (
+from opsi.logging import get_logger, log_context, secret_filter
+from opsi.opsi.service.client import ServiceClient, get_service_client
+from opsi.opsi.service.model.object import (
 	OpsiClient,
 	OpsiConfigserver,
 	OpsiDepotserver,
 	ProductOnClient,
 )
-from opsicommon.types import forceHostId, forceIPAddress, forceUnicodeLower
-from opsicommon.utils import monkeypatch_subprocess_for_frozen
 
 logger = get_logger("opsi-deploy-client-agent")
-monkeypatch_subprocess_for_frozen()
 
 backend = None
 
@@ -53,9 +51,9 @@ def get_product_id() -> str:
 		workdir = os.path.dirname(os.path.abspath(__file__))  # for running from python
 	try:
 		os.chdir(workdir)
-	except Exception as error:
-		logger.error(error, exc_info=True)
-		raise error
+	except OSError:
+		logger.exception("Could not change working directory")
+		raise
 
 	if "opsi-linux-client-agent" in workdir:
 		product_id = "opsi-linux-client-agent"
@@ -88,7 +86,7 @@ def _get_id_from_hostname(host: str, host_ip: str | None = None) -> str:
 			host = socket.getfqdn(socket.gethostbyname(host))
 
 			try:
-				if host_ip == forceIPAddress(host):  # Lookup did not succeed
+				if host_ip == str(ipaddress.ip_address(host)):  # Lookup did not succeed
 					host = host_before  # Falling back to hopefully valid hostname
 			except ValueError:
 				pass  # no IP - great!
@@ -99,9 +97,9 @@ def _get_id_from_hostname(host: str, host_ip: str | None = None) -> str:
 
 	logger.debug("Host is now: %s", host)
 	if host.count(".") < 2:
-		host_id = forceHostId(f'{host}.{".".join(socket.getfqdn().split(".")[1:])}')
+		host_id = f"{host}.{'.'.join(socket.getfqdn().split('.')[1:])}"
 	else:
-		host_id = forceHostId(host)
+		host_id = host
 
 	logger.info("Got host_id %s", host_id)
 	return host_id
@@ -150,7 +148,7 @@ class DeployThread(threading.Thread):
 		self.skip_existing_client = skip_existing_client
 		self.product_id = get_product_id()
 
-		deployment_method = forceUnicodeLower(deployment_method)
+		deployment_method = deployment_method.lower()
 		if deployment_method == "auto":
 			self._detect_deployment_method(host)
 		else:
@@ -180,7 +178,7 @@ class DeployThread(threading.Thread):
 			self.deployment_method = "hostname"
 			return
 		try:
-			forceIPAddress(host)
+			ipaddress.ip_address(host)
 			logger.debug("Valid IP found.")
 			self.deployment_method = "ip"
 		except ValueError:
@@ -194,7 +192,7 @@ class DeployThread(threading.Thread):
 		host_ip = None
 		try:
 			if self.deployment_method == "ip":
-				host_ip = forceIPAddress(host)
+				host_ip = str(ipaddress.ip_address(host))
 				(hostname, _, _) = socket.gethostbyaddr(host_ip)
 				host = hostname
 				logger.debug("Lookup of IP returned hostname %s", host)
@@ -225,7 +223,7 @@ class DeployThread(threading.Thread):
 			if not self.host:
 				raise ValueError("No host name given")
 			ip_address = socket.gethostbyname(self.host)
-		except Exception as err:
+		except (OSError, ValueError) as err:
 			logger.warning("Failed to get ip address for host %s by syscall: %s", self.host, err)
 
 		if ip_address:
@@ -250,7 +248,7 @@ class DeployThread(threading.Thread):
 		try:
 			execute(f"ping -q -c2 {ip_address}")
 			alive = True
-		except Exception as err:
+		except (OSError, subprocess.SubprocessError) as err:
 			logger.error(err)
 
 		if alive:
@@ -279,7 +277,7 @@ class DeployThread(threading.Thread):
 				logger.debug("Updated config now is: %s", client_config)
 
 			logger.notice("Creating client %s", self.host)
-			get_backend().host_createObjects([OpsiClient(**client_config)])  # type: ignore  # pylint: disable=no-member  # type: ignore
+			get_backend().host_createObjects([OpsiClient(**client_config)])  # type: ignore  # pylint: disable=no-member
 			self._client_created_by_script = True
 
 	def _put_client_into_group(self) -> None:
@@ -295,7 +293,7 @@ class DeployThread(threading.Thread):
 		try:
 			get_backend().objectToGroup_createObjects([mapping])  # type: ignore  # pylint: disable=no-member
 			logger.notice("Added %s to group %s", self.host, self.group)
-		except Exception as err:
+		except Exception as err:  # noqa: BLE001
 			logger.warning("Adding %s to group %s failed: %s", self.host, self.group, err)
 
 	def _assign_client_to_depot(self) -> None:
@@ -311,7 +309,7 @@ class DeployThread(threading.Thread):
 		try:
 			get_backend().configState_createObjects([depot_assignment])  # type: ignore  # pylint: disable=no-member
 			logger.notice("Assigned %s to depot %s", self.host, self.depot)
-		except Exception as err:
+		except Exception as err:  # noqa: BLE001
 			logger.warning("Assgining %s to depot %s failed: %s", self.host, self.depot, err)
 
 	@staticmethod
@@ -362,7 +360,7 @@ class DeployThread(threading.Thread):
 		try:
 			logger.notice("Deleting client %s from backend", self.host)
 			get_backend().host_deleteObjects([self.host])  # type: ignore  # pylint: disable=no-member
-		except Exception as err:
+		except Exception as err:  # noqa: BLE001
 			logger.error(err)
 
 	def _get_service_address(self, host_id: str) -> str:
@@ -439,7 +437,7 @@ class DeployThread(threading.Thread):
 				except subprocess.TimeoutExpired:
 					self.result = "failed:timeout"
 					raise
-			except Exception as error:
+			except Exception as error:  # noqa: BLE001
 				if self.result == "noattempt":
 					self.result = "failed:unknownreason"
 				logger.error("Deployment to %s failed: %s", self.host, error)

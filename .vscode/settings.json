@@ -16,5 +16,9 @@
 	],
 	"python.testing.pytestEnabled": true,
 	"files.trimTrailingWhitespace": true,
-	"python.languageServer": "Pylance"
+	"python.languageServer": "Pylance",
+	"cSpell.words": [
+		"opsideployclientagent"
+	],
+	"python-envs.defaultEnvManager": "ms-python.python:venv"
 }

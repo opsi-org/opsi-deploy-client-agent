@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # opsi-deploy-client-agent is part of the desktop management solution opsi http://www.opsi.org
 # Copyright (c) 2020-2025 uib GmbH <info@uib.de>
 # This code is owned by the uib GmbH, Mainz, Germany (uib.de). All rights reserved.
@@ -17,9 +18,8 @@ import traceback
 from pathlib import Path
 
 import paramiko  # type: ignore[import]
-from opsicommon import __version__ as python_opsi_common_version
-from opsicommon.logging import get_logger, logging_config
-from opsicommon.logging.constants import DEFAULT_COLORED_FORMAT, LOG_DEBUG, LOG_WARNING
+from opsi import __version__ as python_opsi_version
+from opsi.logging import DEFAULT_COLORED_FORMAT, LOG_DEBUG, LOG_WARNING, get_logger, logging_config
 
 from opsideployclientagent import __version__, deploy_client_agent
 from opsideployclientagent.common import get_product_id
@@ -41,21 +41,17 @@ def get_target_os() -> str:
 def parse_args(target_os: str) -> argparse.Namespace:
 	script_description = "Deploy opsi client agent to the specified clients."
 	if target_os in ("linux", "macos"):
-		script_description = "\n".join(
-			(
-				script_description,
-				"The clients must be accessible via SSH.",
-				"The user must be allowed to use sudo non-interactive.",
-			)
+		script_description = (
+			f"{script_description}\n"
+			"The clients must be accessible via SSH.\n"
+			"The user must be allowed to use sudo non-interactive."
 		)
 		default_user = "root"
 	else:
-		script_description = "\n".join(
-			(
-				script_description,
-				"The c$ and admin$ must be accessible on every client.",
-				"Simple File Sharing (Folder Options) should be disabled on the Windows machine.",
-			)
+		script_description = (
+			f"{script_description}\n"
+			"The c$ and admin$ must be accessible on every client.\n"
+			"Simple File Sharing (Folder Options) should be disabled on the Windows machine."
 		)
 		default_user = "Administrator"
 
@@ -64,7 +60,7 @@ def parse_args(target_os: str) -> argparse.Namespace:
 		"--version",
 		"-V",
 		action="version",
-		version=f"{__version__} [python-opsi-common={python_opsi_common_version}]",
+		version=f"{__version__} [python-opsi={python_opsi_version}]",
 	)
 	parser.add_argument(
 		"--verbose",
@@ -303,7 +299,7 @@ def main() -> None:
 	except KeyboardInterrupt:
 		print("Interrupted", file=sys.stderr)
 		sys.exit(1)
-	except Exception:
+	except Exception:  # noqa: BLE001
 		# Do not let pyinstaller handle exceptions and print:
 		# "Failed to execute script run-opsiutils"
 		traceback.print_exc()

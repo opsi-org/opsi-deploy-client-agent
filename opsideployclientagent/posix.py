@@ -12,11 +12,11 @@ This module contains the class PosixDeployThread and related methods.
 import os
 import re
 import sys
+from collections.abc import Generator
 from contextlib import closing, contextmanager
-from typing import Generator
 
 import paramiko  # type: ignore[import]
-from opsicommon.logging import get_logger
+from opsi.logging import get_logger
 
 from opsideployclientagent.common import DeployThread, FiletransferUnsuccessful
 
@@ -86,10 +86,12 @@ class PosixDeployThread(DeployThread):
 				os.path.join(local_folder, "oca-installation-helper"), os.path.join(self.remote_folder, "oca-installation-helper")
 			)
 		except Exception as error:
-			logger.error("Failed to copy installation files: %s", error, exc_info=True)
+			logger.exception("Failed to copy installation files")
 			raise FiletransferUnsuccessful from error
 
 	def run_installation(self) -> None:
+		if not self.remote_folder:
+			raise ValueError("No remote folder set.")
 		self._execute_via_ssh(f"chmod +x {self.remote_folder}/oca-installation-helper")
 		if not self.host_object:
 			raise ValueError("No valid host object found.")
@@ -132,7 +134,7 @@ class PosixDeployThread(DeployThread):
 			try:
 				# finalization is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(cmd, timeout=120)
-			except Exception as err:
+			except Exception as err:  # noqa: BLE001
 				logger.error("Failed to %s on %s: %s", self.finalize_action, self.network_address, err)
 
 	def cleanup(self) -> None:
@@ -141,13 +143,13 @@ class PosixDeployThread(DeployThread):
 				# remote_folder includes credentialsfile if any
 				# Cleanup is not allowed to take longer than 2 minutes
 				self._execute_via_ssh(f"rm -rf {self.remote_folder}", timeout=120)
-		except Exception as err:
+		except Exception as err:  # noqa: BLE001
 			logger.error("Cleanup failed: %s", err)
 
 		if self._ssh_connection is not None:
 			try:
 				self._ssh_connection.close()
-			except Exception as err:
+			except Exception as err:  # noqa: BLE001
 				logger.trace("Closing SSH connection failed: %s", err)
 
 	def ask_host_for_hostname(self, host: str) -> str:
@@ -212,7 +214,7 @@ class PosixDeployThread(DeployThread):
 
 	def _copy_over_ssh(self, local_path: str, remote_path: str) -> None:
 		@contextmanager
-		def change_directory(path: str) -> Generator[None, None, None]:
+		def change_directory(path: str) -> Generator[None]:
 			current_dir = os.getcwd()
 			os.chdir(path)
 			yield
@@ -221,7 +223,7 @@ class PosixDeployThread(DeployThread):
 		def create_folder_if_missing(ftp_connection: paramiko.SFTPClient, path: str) -> None:
 			try:
 				ftp_connection.mkdir(path)
-			except Exception as err:
+			except Exception as err:  # noqa: BLE001
 				logger.debug("Can't create %s on remote: %s", path, err)
 
 		self._connect_via_ssh()

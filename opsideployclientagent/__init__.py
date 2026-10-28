@@ -10,8 +10,7 @@ import time
 from pathlib import Path
 
 import paramiko  # type: ignore[import]
-from opsicommon.logging import get_logger, secret_filter
-from opsicommon.types import forceUnicode, forceUnicodeLower
+from opsi.logging import get_logger, secret_filter
 
 from opsideployclientagent.common import DeployThread, backend_disconnect, get_backend
 from opsideployclientagent.posix import PosixDeployThread
@@ -37,7 +36,7 @@ def write_failed_clients(clients: dict[str, str], failed_clients_file: Path) -> 
 def get_password(password: str | None) -> str:
 	if not password:
 		print("Password is required for deployment.")
-		password = forceUnicode(getpass.getpass())
+		password = getpass.getpass()
 		if not password:
 			raise ValueError("No password given.")
 
@@ -63,7 +62,7 @@ def deploy_client_agent(
 	stop_on_ping_failure: bool = False,
 	skip_existing_client: bool = False,
 	keep_client_on_failure: bool = True,
-	ssh_hostkey_policy: paramiko.MissingHostKeyPolicy | None = None,
+	ssh_hostkey_policy: type[paramiko.MissingHostKeyPolicy] | None = None,
 	install_timeout: int | None = None,
 	failed_clients_file: Path | None = None,
 ) -> int:
@@ -73,12 +72,12 @@ def deploy_client_agent(
 		else:
 			username = "Administrator"
 
-	additional_host_infos = {}
+	additional_host_infos: dict[str, dict[str, str]] = {}
 	if host_file:
 		with open(host_file, encoding="utf-8") as input_file:
 			for line in input_file:
 				line = line.strip()
-				if not line or line.startswith("#") or line.startswith(";"):
+				if not line or line.startswith(("#", ";")):
 					continue
 
 				try:
@@ -87,7 +86,7 @@ def deploy_client_agent(
 				except ValueError as error:
 					logger.debug("Splitting line '%s' failed: %s", line, error)
 					host = line
-				hosts.append(forceUnicodeLower(host))
+				hosts.append(host.lower())
 
 	if not hosts:
 		raise ValueError("No hosts given.")
@@ -97,10 +96,8 @@ def deploy_client_agent(
 	password = get_password(password)
 	max_threads = int(max_threads)
 
-	DeploymentClass: type = PosixDeployThread
 	if target_os == "windows":
 		logger.info("Deploying to Windows.")
-		DeploymentClass = WindowsDeployThread
 	elif target_os == "linux":
 		logger.info("Deploying to Linux.")
 	elif target_os == "macos":
@@ -126,30 +123,38 @@ def deploy_client_agent(
 				# start new thread
 				host = hosts.pop()
 
-				client_config = {
-					"host": host,
-					"username": username,
-					"password": password,
-					"finalize_action": finalize_action,
-					"deployment_method": deployment_method,
-					"stop_on_ping_failure": stop_on_ping_failure,
-					"skip_existing_client": skip_existing_client,
-					"keep_client_on_failure": keep_client_on_failure,
-					"depot": depot,
-					"group": group,
-					"install_timeout": install_timeout,
-				}
-
-				try:
-					client_config["additional_client_settings"] = additional_host_infos[host]
-				except KeyError:
-					pass
-
-				if target_os in ("linux", "macos"):
-					client_config["ssh_policy"] = ssh_hostkey_policy or paramiko.WarningPolicy
-					client_config["target_os"] = target_os
-
-				thread = DeploymentClass(**client_config)
+				if target_os == "windows":
+					thread = WindowsDeployThread(
+						host=host,
+						username=username,
+						password=password,
+						finalize_action=finalize_action,
+						deployment_method=deployment_method,
+						stop_on_ping_failure=stop_on_ping_failure,
+						skip_existing_client=skip_existing_client,
+						keep_client_on_failure=keep_client_on_failure,
+						additional_client_settings=additional_host_infos.get(host),
+						depot=depot,
+						group=group,
+						install_timeout=install_timeout,
+					)
+				else:
+					thread = PosixDeployThread(
+						host=host,
+						username=username,
+						password=password,
+						target_os=target_os,
+						finalize_action=finalize_action,
+						deployment_method=deployment_method,
+						stop_on_ping_failure=stop_on_ping_failure,
+						skip_existing_client=skip_existing_client,
+						keep_client_on_failure=keep_client_on_failure,
+						additional_client_settings=additional_host_infos.get(host),
+						depot=depot,
+						group=group,
+						ssh_policy=ssh_hostkey_policy or paramiko.WarningPolicy,
+						install_timeout=install_timeout,
+					)
 				total += 1
 				thread.daemon = True
 				thread.start()
@@ -165,7 +170,8 @@ def deploy_client_agent(
 						skips += 1
 					elif thread.result == "success":
 						success += 1
-						failed_clients.update({thread.host: thread.result})
+						if thread.host:
+							failed_clients[thread.host] = thread.result
 			running_threads = new_running_threads
 			time.sleep(1)
 		except KeyboardInterrupt:

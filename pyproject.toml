@@ -4,14 +4,13 @@ version = "4.3.2.1"
 description = "tool to deploy the opsi-client-agent on linux, windows and macOS clients"
 readme = "README.md"
 license = "AGPL-3.0-only"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.15,<3.16"
 dependencies = [
-	"python-opsi-common>=4.3.29,<4.4",
+	"python-opsi>=4.3.29,<4.4",
 	"paramiko>=3.4",
 	"impacket>=0.11",
 	"smbprotocol>=1.13",
 	"gssapi>=1.8",
-	"pydantic-core>=2.20",
 	"annotated-types>=0.7",
 ]
 
@@ -24,7 +23,7 @@ name = "uib GmbH"
 email = "info@uib.de"
 
 [dependency-groups]
-dev = ["ruff>=0.5", "pytest>=8.2", "pyinstaller>=6.9", "mypy>=1.10"]
+dev = ["ruff>=0.5", "pytest>=8.2", "pyinstaller>=6.9", "ty>=0.0"]
 
 [project.urls]
 Homepage = "https://www.opsi.org"
