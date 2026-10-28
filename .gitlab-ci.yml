@@ -9,6 +9,7 @@ test:pytest-pylint:
   script:
     - export UV_PYTHON="3.15"
     - export UV_PYTHON_PREFERENCE="only-managed"
+    - uv python upgrade 3.15
     - uv sync --frozen
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
@@ -21,6 +22,7 @@ build:linux-pyinstaller:
   script:
     - export UV_PYTHON="3.15"
     - export UV_PYTHON_PREFERENCE="only-managed"
+    - uv python upgrade 3.15
     - uv sync --frozen
     # Conflicts with smbclient package
     - rm .venv/bin/smbclient.py || true
