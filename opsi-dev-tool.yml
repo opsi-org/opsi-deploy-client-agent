@@ -13,7 +13,6 @@ pyinstaller:
   hidden_imports:
     all:
       - paramiko
-      - gssapi
   extra_args:
     darwin:
       - --exclude-module
